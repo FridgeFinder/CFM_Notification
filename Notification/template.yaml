@@ -1,21 +1,85 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Notification
+  Notifications
 
-  Sample SAM Template for Notification
+  Sample SAM Template for FridgeFinder Notifications Service
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 60
     MemorySize: 256
 
+Parameters:
+  Environment:
+    Type: String
+    Description: Choose between local or AWS
+    AllowedValues:
+      - local
+      - aws
+  Stage:
+    Type: String
+    Description: Choose between dev, staging, prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+  CFMHostedZoneId:
+    Type: String
+    Description: Grab the HostedZoneId from Route53 console
+
+
 Resources:
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub api-${Stage}.communityfridgefinder.com
+      DomainValidationOptions:
+       - DomainName: !Sub api-${Stage}.communityfridgefinder.com
+         HostedZoneId: !Sub ${CFMHostedZoneId}
+      ValidationMethod: DNS
+  ApiGatewayApi:
+      Type: AWS::Serverless::Api
+      Properties:
+        StageName: !Ref Stage
+        # CORS preflight settings from https://vercel.com/guides/how-to-enable-cors
+        Cors:
+          AllowMethods: "'GET,OPTIONS,PATCH,DELETE,POST,PUT'"
+          AllowHeaders: "'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length,
+            Content-MD5, Content-Type, Date, X-Api-Version'"
+          AllowOrigin: "'*'"
+          MaxAge: "'86400'"
+          AllowCredentials: false
+        EndpointConfiguration: REGIONAL
+        Domain:
+          DomainName: !Sub api-${Stage}.communityfridgefinder.com
+          CertificateArn: !Ref ApiCertificate
+          Route53:
+            HostedZoneName: "communityfridgefinder.com." # NOTE: The period at the end is required
+  
+  ##########################
+  ##    CommonLayer    ##
+  ##########################
+  CommonLayer:
+        Type: AWS::Serverless::LayerVersion
+        Properties:
+            LayerName: !Sub FridgeFinderNotificationsLayer${Stage}
+            Description: Dependencies for FridgeFinder Notifications service
+            ContentUri: dependencies/
+            CompatibleRuntimes:
+              - python3.7
+              - python3.8
+              - python3.9
+            RetentionPolicy: Delete
+  
+  ##########################
+  ##   Lambda Functions   ##
+  ##########################
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello_world/
+      CodeUri: functions/hello_world/
       Handler: app.lambda_handler
       Runtime: python3.9
       Architectures:
@@ -26,13 +90,108 @@ Resources:
           Properties:
             Path: /hello
             Method: get
+  
+  UserNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/notifications/user
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      FunctionName: !Sub UserNotificationsFunction${Stage}
+      Environment:
+        Variables:
+          Environment: !Ref Environment
+          Stage: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            Resource: !GetAtt NotificationsTable.Arn
+      Events:
+        PostNotification:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Method: post
+            RestApiId:
+              Ref: ApiGatewayApi
+        PutNotification:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Method: put
+            RestApiId:
+              Ref: ApiGatewayApi
+        GetUserNotification:
+          Type: Api
+          Properties:
+            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
+            RequestParameters:
+              - method.request.path.userId:
+                  Required: true
+                  Caching: false
+              - method.request.path.fridgeId:
+                  Required: true
+                  Caching: false
+  
+  GetAllUserNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/notifications/getAllUserNotifications
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      FunctionName: !Sub GetAllUserNotificationsFunction${Stage}
+      Environment:
+        Variables:
+          Environment: !Ref Environment
+          Stage: !Ref Stage
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:Scan
+            Resource: !GetAtt NotificationsTable.Arn
+      Events:
+        GetAllUserNotifications:
+          Type: Api
+          Properties:
+            Path: /v1/users/{userId}/notifications
+            Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
+            RequestParameters:
+              - method.request.path.userId:
+                  Required: true
+                  Caching: false      
 
   ##########################
   ##    DynamoDB Tables    ##
   ##########################
 
-  #Note: The UserId.. that can be the actual user.. and we could query on that.. 
-  NotificationTable:
+  NotificationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: "PAY_PER_REQUEST"
@@ -55,8 +214,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType:All
-
-
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
