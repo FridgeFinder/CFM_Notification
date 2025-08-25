@@ -85,7 +85,12 @@ class UserFridgeNotificationModel(BaseModel):
     
 
     @model_validator(mode="after")
-    def validate_preferences_vs_status(self) -> "UserFridgeNotificationModel":
+    def validate_contact_type_fields_are_set(self) -> "UserFridgeNotificationModel":
+        ###
+        #Validates that if email, sms, or device is set on any of these fields:
+        #contact_types_status, contact_types_preferences, contact_info
+        #then they must be on all of them
+        ###
         field_names = ContactTypeStatusModel.model_fields.keys()
 
         for field in field_names:
