@@ -2,20 +2,20 @@ import os
 import logging
 import json
 
-# try:
-from user_fridge_notifications_model import get_ddb_connection, UserFridgeNotificationModel
-from user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
-from pydantic import ValidationError
-# except ModuleNotFoundError:
-#     # If it gets here it's because we are performing a unit test. It's a common error when using lambda layers
-#     # Here is an example of someone having a similar issue:
-#     # https://stackoverflow.com/questions/69592094/pytest-failing-in-aws-sam-project-due-to-modulenotfounderror
-#     from dependencies.python.user_fridge_notifications_model import (
-#         get_ddb_connection, UserFridgeNotificationModel
-#     )
-#     from dependencies.python.user_fridge_notifications_api import (
-#         ApiResponse, UserFridgeNotificationApi
-#     )
+try:
+    from user_fridge_notifications_model import get_ddb_connection, UserFridgeNotificationModel
+    from user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
+    from pydantic import ValidationError
+except ModuleNotFoundError:
+    # If it gets here it's because we are performing a unit test. It's a common error when using lambda layers
+    # Here is an example of someone having a similar issue:
+    # https://stackoverflow.com/questions/69592094/pytest-failing-in-aws-sam-project-due-to-modulenotfounderror
+    from dependencies.python.user_fridge_notifications_model import (
+        get_ddb_connection, UserFridgeNotificationModel
+    )
+    from dependencies.python.user_fridge_notifications_api import (
+        ApiResponse, UserFridgeNotificationApi
+    )
     
 env = os.environ["Environment"]
 #initialized only once per container
