@@ -59,21 +59,6 @@ Resources:
             HostedZoneName: "communityfridgefinder.com." # NOTE: The period at the end is required
   
   ##########################
-  ##    CommonLayer    ##
-  ##########################
-  CommonLayer:
-        Type: AWS::Serverless::LayerVersion
-        Properties:
-            LayerName: !Sub FridgeFinderNotificationsLayer${Stage}
-            Description: Dependencies for FridgeFinder Notifications service
-            ContentUri: dependencies/
-            CompatibleRuntimes:
-              - python3.7
-              - python3.8
-              - python3.9
-            RetentionPolicy: Delete
-  
-  ##########################
   ##   Lambda Functions   ##
   ##########################
   HelloWorldFunction:
@@ -81,7 +66,7 @@ Resources:
     Properties:
       CodeUri: functions/hello_world/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.13
       Architectures:
         - x86_64
       Events:
@@ -90,14 +75,16 @@ Resources:
           Properties:
             Path: /hello
             Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
   
-  UserNotificationsFunction:
+  UserFridgeNotificationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/notifications/user
+      CodeUri: functions/fridge_notifications/user
       Handler: app.lambda_handler
-      Runtime: python3.9
-      FunctionName: !Sub UserNotificationsFunction${Stage}
+      Runtime: python3.13
+      FunctionName: !Sub UserFridgeNotificationsFunction${Stage}
       Environment:
         Variables:
           Environment: !Ref Environment
@@ -117,44 +104,44 @@ Resources:
             Action:
             - dynamodb:GetItem
             - dynamodb:PutItem
-            Resource: !GetAtt NotificationsTable.Arn
+            Resource: !GetAtt UserFridgeNotificationsTable.Arn
       Events:
-        PostNotification:
+        PostUserFridgeNotification:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Path: /v1/users/{user_id}/notifications/{fridge_id}
             Method: post
             RestApiId:
               Ref: ApiGatewayApi
-        PutNotification:
+        PutUserFridgeNotification:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Path: /v1/users/{user_id}/notifications/{fridge_id}
             Method: put
             RestApiId:
               Ref: ApiGatewayApi
-        GetUserNotification:
+        GetUserFridgeNotification:
           Type: Api
           Properties:
-            Path: /v1/users/{userId}/notifications/{fridgeId}
+            Path: /v1/users/{user_id}/notifications/{fridge_id}
             Method: get
             RestApiId:
               Ref: ApiGatewayApi
             RequestParameters:
-              - method.request.path.userId:
+              - method.request.path.user_id:
                   Required: true
                   Caching: false
-              - method.request.path.fridgeId:
+              - method.request.path.fridge_id:
                   Required: true
                   Caching: false
   
-  GetAllUserNotificationsFunction:
+  GetAllUserFridgeNotificationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/notifications/getAllUserNotifications
+      CodeUri: functions/fridge_notifications/getAllUserNotifications
       Handler: app.lambda_handler
-      Runtime: python3.9
-      FunctionName: !Sub GetAllUserNotificationsFunction${Stage}
+      Runtime: python3.13
+      FunctionName: !Sub GetAllUserFridgeNotificationsFunction${Stage}
       Environment:
         Variables:
           Environment: !Ref Environment
@@ -173,17 +160,17 @@ Resources:
           - Effect: Allow
             Action:
             - dynamodb:Scan
-            Resource: !GetAtt NotificationsTable.Arn
+            Resource: !GetAtt UserFridgeNotificationsTable.Arn
       Events:
-        GetAllUserNotifications:
+        GetAllUserFridgeNotifications:
           Type: Api
           Properties:
-            Path: /v1/users/{userId}/notifications
+            Path: /v1/users/{user_id}/fridges/notifications
             Method: get
             RestApiId:
               Ref: ApiGatewayApi
             RequestParameters:
-              - method.request.path.userId:
+              - method.request.path.user_id:
                   Required: true
                   Caching: false      
 
@@ -191,29 +178,44 @@ Resources:
   ##    DynamoDB Tables    ##
   ##########################
 
-  NotificationsTable:
+  UserFridgeNotificationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      TableName: !Sub user_fridge_notifications_${Stage}
       BillingMode: "PAY_PER_REQUEST"
       AttributeDefinitions:
-        - AttributeName: "userId"
+        - AttributeName: "user_id"
           AttributeType: "S"
-        - AttributeName: "fridgeId"
+        - AttributeName: "fridge_id"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "userId"
+        - AttributeName: "user_id"
           KeyType: "HASH"
-        - AttributeName: "fridgeId"
+        - AttributeName: "fridge_id"
           KeyType: "RANGE"
       GlobalSecondaryIndexes:
         - IndexName: FridgeIndex
           KeySchema:
-            - AttributeName: fridgeId
+            - AttributeName: fridge_id
               KeyType: HASH
-            - AttributeName: userId
+            - AttributeName: user_id
               KeyType: RANGE
           Projection:
             ProjectionType:All
+      #TODO: should we add ProvisionedThroughput?
+
+  ##########################
+  ##    CommonLayer    ##
+  ##########################
+  CommonLayer:
+        Type: AWS::Serverless::LayerVersion
+        Properties:
+            LayerName: !Sub FridgeNotificationsLayer${Stage}
+            Description: Dependencies for FridgeFinder Fridge Notifications service
+            ContentUri: dependencies/
+            CompatibleRuntimes:
+              - python3.13
+            RetentionPolicy: Delete
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
