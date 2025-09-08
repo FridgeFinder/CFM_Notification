@@ -78,7 +78,7 @@ Confirm that the following requests work for you
 5. `curl http://localhost:3000/hello`
     * response: ```{"message": "hello world"}```
 
-If it does yay 🤸‍♀️
+If it does yay, keep going 🤸‍♀️
 
 ---
 ## Local API
@@ -94,7 +94,10 @@ URL format: `v1/users/{user_id}/notifications/{fridge_id}`
 Note: make sure your local dynamodb instance is running on docker. Follow instructions on `Setup Local Database Connection`
 
 ### Local Server
-1. Start Server: `sam local start-api --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network`
+1. Start Server: 
+   ```bash
+   Notification$ sam local start-api --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+   ```
 2. POST Example
     ```
     curl --location --request POST 'http://localhost:3000/v1/users/user_1/notifications/fridge_1' --header 'Content-Type: application/json' --data-raw '{
@@ -103,5 +106,15 @@ Note: make sure your local dynamodb instance is running on docker. Follow instru
     "contact_info": {"sms": "+18574078438"}
     }'
     ```
+  2. PUT Example
+     ```
+     curl --location --request PUT 'http://localhost:3000/v1/users/user_1/notifications/fridge_1' --header 'Content-Type: application/json' --data-raw '{
+     "contact_types_status": {"sms": "stop"},
+     "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
+     "contact_info": {"sms": "+18574078438"}
+     }'
+     ```
 3. GET Example
-    * Example: curl http://localhost:3000/v1/users/user_1/notifications/fridge_1
+    ```
+    curl http://localhost:3000/v1/users/user_1/notifications/fridge_1
+    ```

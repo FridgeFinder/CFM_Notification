@@ -48,6 +48,10 @@ def lambda_handler(event, context):
         api_response = api.post_user_fridge_notification(user_notification_model=user_fridge_notification_model)
         return api_response.api_format()
     
+    if httpMethod == "PUT":
+        api_response = api.put_user_fridge_notification(user_notification_model=user_fridge_notification_model)
+        return api_response.api_format()
+    
     ### IF NONE OF THE ABOVE THEN THE HTTP METHOD IS INVALID
     api_response = ApiResponse(status_code=400, body={"message": "invalid http method"})
     return api_response.api_format()

@@ -30,10 +30,10 @@ class ContactTypeStatusEnum(Enum):
 class FridgePreferencesModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
     good: bool
-    dirty: bool
-    out_of_order: bool
-    not_at_location: bool
-    ghost: bool
+    dirty: bool = True
+    out_of_order: bool = True
+    not_at_location: bool = True
+    ghost: bool = True
     food_level_0: bool
     food_level_1: bool
     food_level_2: bool
@@ -70,7 +70,8 @@ class UserFridgeNotificationModel(BaseModel):
     contact_types_status: ContactTypeStatusModel
     contact_types_preferences: ContactTypePreferencesModel
     created_at: Optional[datetime] = Field(default=None)
-    updated_at: Optional[datetime] = Field(default=None)        
+    updated_at: Optional[datetime] = Field(default=None)   
+    #last_notified?     
 
     @field_validator('contact_info')
     @classmethod
