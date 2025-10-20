@@ -81,11 +81,6 @@ Confirm that the following requests work for you
 If it does yay, keep going 🤸‍♀️
 
 ---
-## Local API
-
-Choose your favorite API platform for using APIs.
-Recommend: https://www.postman.com/
-
 ### User Fridge Notification
 These APIs are for interacting with individual user/fridge notification records
 
@@ -93,28 +88,61 @@ URL format: `v1/users/{user_id}/notifications/{fridge_id}`
 
 Note: make sure your local dynamodb instance is running on docker. Follow instructions on `Setup Local Database Connection`
 
-### Local Server
-1. Start Server: 
-   ```bash
-   Notification$ sam local start-api --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
-   ```
-2. POST Example
+#### Local Invoke
+
+To test locally we use `sam local invoke` to mimick a cognito authorized request
+
+1. POST Example
+    ```bash
+    sam local invoke UserFridgeNotificationsFunction --event events/post_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
     ```
-    curl --location --request POST 'http://localhost:3000/v1/users/user_1/notifications/fridge_1' --header 'Content-Type: application/json' --data-raw '{
-    "contact_types_status": {"sms": "start"},
-    "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
-    "contact_info": {"sms": "+18574078438"}
-    }'
-    ```
-  2. PUT Example
+
+2. PUT Example
+     ```bash
+     sam local invoke UserFridgeNotificationsFunction --event events/put_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
      ```
-     curl --location --request PUT 'http://localhost:3000/v1/users/user_1/notifications/fridge_1' --header 'Content-Type: application/json' --data-raw '{
-     "contact_types_status": {"sms": "stop"},
-     "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
-     "contact_info": {"sms": "+18574078438"}
-     }'
-     ```
+     
 3. GET Example
+    ```bash
+    sam local invoke UserFridgeNotificationsFunction --event events/get_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
     ```
-    curl http://localhost:3000/v1/users/user_1/notifications/fridge_1
-    ```
+
+---
+## Running Unit Tests
+
+1. Create and activate a virtual environment from the project root:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2. Upgrade packaging tools and install the project in editable mode:
+
+```sh
+pip install -U pip setuptools wheel
+pip install -e .
+```
+
+3. Install test dependencies:
+
+```sh
+pip install -r Notification/tests/requirements.txt
+```
+
+4. Run tests (unittest discovery):
+
+```sh
+python -m unittest discover -s Notification/tests/unit -t .
+```
+
+Or run a single test file:
+
+```sh
+python -m unittest Notification.tests.unit.test_user_fridge_notifications_api
+```
+
+To deactivate the environment when done:
+```sh
+deactivate
+```

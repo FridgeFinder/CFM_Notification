@@ -1,7 +1,12 @@
 from boto3.dynamodb.types import TypeSerializer
 from boto3.dynamodb.types import TypeDeserializer
 from datetime import datetime, timezone
-from user_fridge_notifications_model import UserFridgeNotificationModel
+try:
+    # Preferred: relative import when running inside SAM/local container
+    from user_fridge_notifications_model import UserFridgeNotificationModel
+except ModuleNotFoundError:
+    # Fallback: absolute import when package is installed for tests
+    from Notification.dependencies.python.user_fridge_notifications_model import UserFridgeNotificationModel
 import json
 from botocore.exceptions import ClientError
 import logging
@@ -62,10 +67,11 @@ class UserFridgeNotificationApi:
                 ConditionExpression="attribute_not_exists(user_id) AND attribute_not_exists(fridge_id)"
             )
             return ApiResponse(status_code=201, body=dict_format)
-        except self.db_client.exceptions.ConditionalCheckFailedException as e:
-            error_message = f"UserFridgeNotification with user_id: {user_notification_model.user_id}, and fridge_id: {user_notification_model.fridge_id} already exists"
-            return ApiResponse(status_code=409, body={"message": error_message})
         except ClientError as e:
+            error_code = e.response['Error'].get('Code')
+            if error_code == "ConditionalCheckFailedException":
+                error_message = f"UserFridgeNotification with user_id: {user_notification_model.user_id}, and fridge_id: {user_notification_model.fridge_id} already exists"
+                return ApiResponse(status_code=409, body={"message": error_message})
             logger.error("DynamoDB error during POST: %s", e, exc_info=True)
             return ApiResponse(status_code=500, body={"message": "Database Error"})
 

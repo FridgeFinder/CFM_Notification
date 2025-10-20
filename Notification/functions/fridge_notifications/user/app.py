@@ -7,15 +7,10 @@ try:
     from user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
     from pydantic import ValidationError
 except ModuleNotFoundError:
-    # If it gets here it's because we are performing a unit test. It's a common error when using lambda layers
-    # Here is an example of someone having a similar issue:
-    # https://stackoverflow.com/questions/69592094/pytest-failing-in-aws-sam-project-due-to-modulenotfounderror
-    from dependencies.python.user_fridge_notifications_model import (
-        get_ddb_connection, UserFridgeNotificationModel
-    )
-    from dependencies.python.user_fridge_notifications_api import (
-        ApiResponse, UserFridgeNotificationApi
-    )
+    # Fallback: absolute imports (works when package is installed / running tests)
+    from Notification.dependencies.python.user_fridge_notifications_model import get_ddb_connection, UserFridgeNotificationModel
+    from Notification.dependencies.python.user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
+    from pydantic import ValidationError
     
 env = os.environ["Environment"]
 #initialized only once per container
@@ -24,16 +19,25 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context): 
-    #TODO: Add auth, only admin/user is able to update their own 
+    # Extract Cognito claims
+    claims = event.get("requestContext", {}).get("authorizer", {}).get("claims", {})
+    authenticated_user_id = claims.get("sub") or claims.get("username")
     httpMethod = event.get("httpMethod", None)
     fridge_id = event.get("pathParameters", {}).get("fridge_id", None)
     user_id = event.get("pathParameters", {}).get("user_id", None)
     api = UserFridgeNotificationApi(db_client=db_client)
+    #NOTE: don't need user_id in pathParameters but if we ever want to allow for ADMIN users to 
+    #... access other users' notifications we can keep it
+    # Enforce that the authenticated user can only access their own notifications
+    if not authenticated_user_id or (user_id and user_id != authenticated_user_id):
+        logger.warning(f"Unauthorized access attempt: path user_id={user_id}, auth user_id={authenticated_user_id}")
+        return ApiResponse(status_code=403, body={"message": "Forbidden: You are not authorized to access this resource."}).api_format()
+
     ### GET API
     if httpMethod == "GET":
         api_response = api.get_user_fridge_notification(user_id=user_id, fridge_id=fridge_id)
         return api_response.api_format()
-    
+
     ### POST / PUT API
     body = event.get("body", None)
     if body is None:
@@ -47,11 +51,11 @@ def lambda_handler(event, context):
     if httpMethod == "POST":
         api_response = api.post_user_fridge_notification(user_notification_model=user_fridge_notification_model)
         return api_response.api_format()
-    
+
     if httpMethod == "PUT":
         api_response = api.put_user_fridge_notification(user_notification_model=user_fridge_notification_model)
         return api_response.api_format()
-    
+
     ### IF NONE OF THE ABOVE THEN THE HTTP METHOD IS INVALID
     api_response = ApiResponse(status_code=400, body={"message": "invalid http method"})
     return api_response.api_format()
