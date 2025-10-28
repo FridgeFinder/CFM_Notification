@@ -5,12 +5,12 @@ import json
 try:
     from user_fridge_notifications_model import get_ddb_connection, UserFridgeNotificationModel
     from user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
-    from pydantic import ValidationError
 except ModuleNotFoundError:
     # Fallback: absolute imports (works when package is installed / running tests)
     from Notification.dependencies.python.user_fridge_notifications_model import get_ddb_connection, UserFridgeNotificationModel
     from Notification.dependencies.python.user_fridge_notifications_api import ApiResponse, UserFridgeNotificationApi
-    from pydantic import ValidationError
+
+from pydantic import ValidationError
     
 env = os.environ["Environment"]
 #initialized only once per container
@@ -18,10 +18,11 @@ db_client = get_ddb_connection(env)
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def lambda_handler(event, context): 
+def lambda_handler(event, context):     
     # Extract Cognito claims
     claims = event.get("requestContext", {}).get("authorizer", {}).get("claims", {})
-    authenticated_user_id = claims.get("sub") or claims.get("username")
+    
+    authenticated_user_id = claims.get("sub")
     httpMethod = event.get("httpMethod", None)
     fridge_id = event.get("pathParameters", {}).get("fridge_id", None)
     user_id = event.get("pathParameters", {}).get("user_id", None)

@@ -146,3 +146,8 @@ To deactivate the environment when done:
 ```sh
 deactivate
 ```
+
+## Deployment
+1. Build: `sam build --use-container`
+2. Deploy: `sam deploy --config-file samconfig.toml --config-env <ENVIRONMENT>`
+  * edit CFMHostedZoneId in samconfig.toml 

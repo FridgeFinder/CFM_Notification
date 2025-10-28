@@ -34,19 +34,15 @@ Resources:
   ApiCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      DomainName: !Sub api-${Stage}.communityfridgefinder.com
+      DomainName: !Sub notifications-api-${Stage}.communityfridgefinder.com
       DomainValidationOptions:
-       - DomainName: !Sub api-${Stage}.communityfridgefinder.com
+       - DomainName: !Sub notifications-api-${Stage}.communityfridgefinder.com
          HostedZoneId: !Sub ${CFMHostedZoneId}
       ValidationMethod: DNS
   ApiGatewayApi:
       Type: AWS::Serverless::Api
       Properties:
-        Auth:
-          Authorizers:
-            CognitoAuthorizer:
-              UserPoolArn: 
-                Fn::ImportValue: !Sub "fridgefinder-auth-${Stage}-UserPoolId"
+        Description: "FridgeFinder Notifications API with Cognito Authorization"
         StageName: !Ref Stage
         # CORS preflight settings from https://vercel.com/guides/how-to-enable-cors
         Cors:
@@ -57,8 +53,16 @@ Resources:
           MaxAge: "'86400'"
           AllowCredentials: false
         EndpointConfiguration: REGIONAL
+        Auth:
+          Authorizers:
+            CognitoAuthorizer:
+              UserPoolArn:
+                Fn::ImportValue: !Sub "fridgefinder-auth-${Stage}-UserPoolArn"
+              Identity:
+                Header: Authorization
+              AuthorizerPayloadFormatVersion: "1.0"
         Domain:
-          DomainName: !Sub api-${Stage}.communityfridgefinder.com
+          DomainName: !Sub notifications-api-${Stage}.communityfridgefinder.com
           CertificateArn: !Ref ApiCertificate
           Route53:
             HostedZoneName: "communityfridgefinder.com." # NOTE: The period at the end is required
@@ -171,7 +175,10 @@ Resources:
           - Effect: Allow
             Action:
             - dynamodb:Scan
-            Resource: !GetAtt UserFridgeNotificationsTable.Arn
+            - dynamodb:Query
+            Resource: 
+              - !GetAtt UserFridgeNotificationsTable.Arn
+              - !Sub "${UserFridgeNotificationsTable.Arn}/index/*"
       Events:
         GetAllUserFridgeNotifications:
           Type: Api
@@ -214,8 +221,7 @@ Resources:
             - AttributeName: user_id
               KeyType: RANGE
           Projection:
-            ProjectionType:All
-      #TODO: should we add ProvisionedThroughput?
+            ProjectionType: ALL
 
   ##########################
   ##    CommonLayer    ##
@@ -231,15 +237,28 @@ Resources:
             RetentionPolicy: Delete
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  NotificationsApiBaseUrl:
+    Description: "Base URL for Notifications API (custom domain)"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/"
+
+  NotificationsApiHelloWorld:
+    Description: "Hello World endpoint URL"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/hello"
+
+  NotificationsApiGetUserFridgeNotification:
+    Description: "GET user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/v1/users/{user_id}/notifications/{fridge_id}"
+
+  NotificationsApiPostUserFridgeNotification:
+    Description: "POST user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/v1/users/{user_id}/notifications/{fridge_id}"
+
+  NotificationsApiPutUserFridgeNotification:
+    Description: "PUT user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/v1/users/{user_id}/notifications/{fridge_id}"
+
+  NotificationsApiGetAllUserFridgeNotifications:
+    Description: "GET all user fridge notifications endpoint URL"
+    Value: !Sub "https://notifications-api-${Stage}.communityfridgefinder.com/v1/users/{user_id}/fridges/notifications"

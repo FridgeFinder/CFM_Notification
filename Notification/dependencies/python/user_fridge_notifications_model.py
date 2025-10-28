@@ -1,5 +1,3 @@
-
-
 from pydantic import BaseModel, field_validator, Field, model_validator, ConfigDict
 from typing import ClassVar
 from enum import Enum
