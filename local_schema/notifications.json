@@ -1,0 +1,27 @@
+{
+  "TableName": "user_fridge_notifications_dev",
+  "AttributeDefinitions": [
+    {
+      "AttributeName": "user_id",
+      "AttributeType": "S"
+    },
+    {
+      "AttributeName": "fridge_id",
+      "AttributeType": "S"
+    }
+  ],
+  "KeySchema": [
+    {
+      "AttributeName": "user_id",
+      "KeyType": "HASH"
+    },
+    {
+      "AttributeName": "fridge_id",
+      "KeyType": "RANGE"
+    }
+  ],
+  "ProvisionedThroughput": {
+    "ReadCapacityUnits": 5,
+    "WriteCapacityUnits": 5
+  }
+}
