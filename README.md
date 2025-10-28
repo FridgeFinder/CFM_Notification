@@ -151,3 +151,24 @@ deactivate
 1. Build: `sam build --use-container`
 2. Deploy: `sam deploy --config-file samconfig.toml --config-env <ENVIRONMENT>`
   * edit CFMHostedZoneId in samconfig.toml 
+
+## APIs with Cognito ID Token - Dev Server Examples
+
+Only authenticated users are able to get or edit their notification preferences
+
+### GET
+```
+curl --location --request GET 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>' --header 'Authorization: <ID_TOKEN>'
+```
+
+### POST/PUT
+```
+curl --location --request <POST/PUT> 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>'
+--header 'Authorization: <ID_TOKEN>'
+--header 'Content-Type: application/json'
+--data '{
+    "contact_types_status": {"sms": "stop"},
+    "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
+    "contact_info": {"sms": "+18577048438"}
+  }'
+```
