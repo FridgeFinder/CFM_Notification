@@ -91,6 +91,7 @@ class UserFridgeNotificationApi:
             
             #update timestamp
             current_time = datetime.now(timezone.utc)
+            expected_updated_at = result["Item"].get("updated_at", {}).get("S", None)#used to avoid race conditions
             user_notification_model.updated_at = current_time
 
             #keep original created_at. Unless not set, which should not be the case
@@ -109,11 +110,16 @@ class UserFridgeNotificationApi:
 
             self.db_client.put_item(
                 TableName=UserFridgeNotificationModel.TABLE_NAME,
-                Item=serialized_data
+                Item=serialized_data,
+                ConditionExpression="updated_at = :expected_updated_at",
+                ExpressionAttributeValues={":expected_updated_at": {"S": expected_updated_at}}
             )
 
             return ApiResponse(status_code=200, body=dict_format)
         except ClientError as e:
+            error_code = e.response['Error'].get('Code')
+            if error_code == "ConditionalCheckFailedException":
+                return ApiResponse(status_code=409, body={"message": "Update conflict, please retry"})
             logger.error("DynamoDB error during PUT: %s", e, exc_info=True)
             return ApiResponse(status_code=500, body={"message": "Database Error"})
 

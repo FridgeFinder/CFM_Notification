@@ -110,6 +110,47 @@ class TestUserFridgeNotificationApi(unittest.TestCase):
             self.assertEqual(response.status_code, 500)
             self.assertEqual(response.body, {"message": "Database Error"})
 
+    def test_race_condition_put(self):
+        # Setup
+        api = UserFridgeNotificationApi(db_client=MagicMock())
+        user_id = "user1"
+        fridge_id = "fridge1"
+        updated_at = "2025-10-28T12:00:00Z"
+        item = {
+            "user_id": {"S": user_id},
+            "fridge_id": {"S": fridge_id},
+            "updated_at": {"S": updated_at}
+        }
+        # Mock get_item to return the same updated_at for both calls
+        api.db_client.get_item.return_value = {"Item": item}
+
+        # First put_item succeeds
+        api.db_client.put_item.return_value = {}
+
+        # Second put_item raises ConditionalCheckFailedException
+        def put_item_side_effect(*args, **kwargs):
+            if hasattr(put_item_side_effect, "called"):
+                raise ClientError(
+                    {"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem"
+                )
+            put_item_side_effect.called = True
+            return {}
+        api.db_client.put_item.side_effect = put_item_side_effect
+
+        # Prepare model
+        model = MagicMock()
+        model.user_id = user_id
+        model.fridge_id = fridge_id
+        model.model_dump.return_value = {"user_id": user_id, "fridge_id": fridge_id, "updated_at": updated_at}
+
+        # First update should succeed
+        response1 = api.put_user_fridge_notification(model)
+        self.assertEqual(response1.status_code, 200)
+
+        # Second update should fail with conflict
+        response2 = api.put_user_fridge_notification(model)
+        self.assertEqual(response2.status_code, 409)
+        self.assertIn("Update conflict, please retry", response2.body["message"])
 
 if __name__ == "__main__":
     unittest.main()
