@@ -22,7 +22,7 @@ def get_ddb_connection(env: str = os.getenv("Environment", "")) -> "botocore.cli
 
 class ContactTypeStatusEnum(Enum):
     START = "start"
-    PAUSED = "pause"
+    PAUSE = "pause"
     STOP = "stop"
 
 class FridgePreferencesModel(BaseModel):
