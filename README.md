@@ -24,7 +24,7 @@ User's of FridgeFinder are able to receive notification on status updates of a C
 
 User's can Follow to a Community Fridge by going to a Fridge Profile and clicking on the Follow Button [TODO: implement follow button :)] - find one near you https://www.fridgefinder.app/browse
 
-Currently User's can receive fridge notification via Email or SMS
+Currently User's can receive fridge notification via Email or Device Push Notification
 
 ---
 ## Pre-Requisites
@@ -70,7 +70,7 @@ Follow these steps to get Dynamodb running locally
 
 Confirm that the following requests work for you
 
-1. `cd Notification/`
+1. `cd user-fridge-notification-service/`
 2. `sam build --use-container`
 3. `sam local invoke HelloWorldFunction --event events/event.json`
     * response: ```{"statusCode": 200, "body": "{\"message\": \"hello world\"}"}```
@@ -90,22 +90,35 @@ Note: make sure your local dynamodb instance is running on docker. Follow instru
 
 #### Local Invoke
 
-To test locally we use `sam local invoke` to mimick a cognito authorized request
+To test locally we use `sam local invoke` to mimick a Firebase authorized request
+
+**Note:** You'll need to replace `<FIREBASE_ID_TOKEN>` in the event JSON files with a valid Firebase ID token from your Firebase project
 
 1. POST Example
     ```bash
-    sam local invoke UserFridgeNotificationsFunction --event events/post_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+    sam local invoke UserFridgeNotificationsFunction --event events/post_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
     ```
 
-2. PUT Example
+2. PATCH Example
      ```bash
-     sam local invoke UserFridgeNotificationsFunction --event events/put_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+     sam local invoke UserFridgeNotificationsFunction --event events/patch_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
      ```
      
 3. GET Example
     ```bash
-    sam local invoke UserFridgeNotificationsFunction --event events/get_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+    sam local invoke UserFridgeNotificationsFunction --event events/get_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
     ```
+
+#### Get All User Notifications
+
+To retrieve all notification preferences for a user across all fridges:
+
+URL format: `v1/users/{user_id}/fridge-notifications`
+
+**Local Invoke Example:**
+```bash
+sam local invoke GetAllUserFridgeNotificationsFunction --event events/get_all_user_notifications.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
+```
 
 ---
 ## Running Unit Tests
@@ -127,13 +140,13 @@ pip install -e .
 3. Install test dependencies:
 
 ```sh
-pip install -r Notification/tests/requirements.txt
+pip install -r user-fridge-notification-service/tests/requirements.txt
 ```
 
 4. Run tests (unittest discovery):
 
 ```sh
-python -m unittest discover -s Notification/tests/unit -t .
+python -m unittest discover -s user-fridge-notification-service/tests/unit -t .
 ```
 
 Or run a single test file:
@@ -148,27 +161,32 @@ deactivate
 ```
 
 ## Deployment
-1. Build: `sam build --use-container`
-2. Deploy: `sam deploy --config-file samconfig.toml --config-env <ENVIRONMENT>`
-  * edit CFMHostedZoneId in samconfig.toml 
 
-## APIs with Cognito ID Token - Dev Server Examples
+### Prerequisites
+- Update `samconfig.toml` with your:
+  - `CFMHostedZoneId` (from Route53 console)
+  - `FirebaseProjectId` (your Firebase project ID)
 
-Only authenticated users are able to get or edit their notification preferences
+### Deploy Steps
+1. Navigate to service directory: `cd user-fridge-notification-service/`
+2. Build: `sam build --use-container`
+3. Deploy to environment:
+   ```bash
+   # Deploy to dev
+   sam deploy --config-file samconfig.toml --config-env dev
+   
+   # Deploy to staging
+   sam deploy --config-file samconfig.toml --config-env staging
+   
+   # Deploy to prod
+   sam deploy --config-file samconfig.toml --config-env prod
+   ```
 
-### GET
-```
-curl --location --request GET 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>' --header 'Authorization: <ID_TOKEN>'
-```
+### Environment Variables
+The following parameters are configured per environment:
+- `DeploymentTarget`: `aws` (for deployed environments) or `local` (for local testing)
+- `Environment`: `dev`, `staging`, or `prod`
+- `CFMHostedZoneId`: Route53 Hosted Zone ID for custom domain
+- `FirebaseProjectId`: Firebase Project ID for authentication
 
-### POST/PUT
-```
-curl --location --request <POST/PUT> 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>'
---header 'Authorization: <ID_TOKEN>'
---header 'Content-Type: application/json'
---data '{
-    "contact_types_status": {"sms": "stop"},
-    "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
-    "contact_info": {"sms": "+18577048438"}
-  }'
-```
+See [FIREBASE_AUTH_SETUP.md](FIREBASE_AUTH_SETUP.md) for Firebase configuration details

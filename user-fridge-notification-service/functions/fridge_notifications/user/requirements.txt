@@ -1,0 +1,4 @@
+# Shared deps provided by CommonLayer or Lambda runtime
+# boto3 is provided by the Lambda runtime
+pydantic>=2.0
+requests>=2.31.0

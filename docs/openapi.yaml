@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: FridgeFinder User-Fridge-Notifications API
+  description: |
+    APIs for managing user-fridge-notification preferences.
+    
+    ## Authentication
+    All endpoints require Firebase JWT authentication.
+    Include the JWT token in the `Authorization` header as `Bearer <token>`.
+
+  version: 1.0.0
+  contact:
+    name: Fridge Finder
+    url: https://fridgefinder.app
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://notifications-api-dev.communityfridgefinder.com
+    description: Development environment
+  - url: https://notifications-api-staging.communityfridgefinder.com
+    description: Staging environment
+  - url: https://notifications-api-prod.communityfridgefinder.com
+    description: Production environment
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - FirebaseAuth: []
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Notifications
+    description: User fridge notification preferences
+
+paths:
+  /hello:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Simple health check endpoint to verify API is running
+      operationId: helloWorld
+      security: []  # No authentication required
+      responses:
+        '200':
+          description: Successful health check
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "hello world"
+
+  /v1/users/{user_id}/fridge-notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Get all notification preferences for a user
+      description: Retrieve all fridge notification preferences for the authenticated user
+      operationId: getAllUserFridgeNotifications
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Successfully retrieved notification preferences
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserFridgeNotification'
+                  count:
+                    type: integer
+                    description: Number of notification preferences returned
+                    example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/users/{user_id}/fridge-notifications/{fridge_id}:
+    get:
+      tags:
+        - Notifications
+      summary: Get notification preferences for a specific fridge
+      description: Retrieve notification preferences for a specific fridge and user combination
+      operationId: getUserFridgeNotification
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/FridgeId'
+      responses:
+        '200':
+          description: Successfully retrieved notification preference
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFridgeNotification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Notifications
+      summary: Create notification preferences for a fridge
+      description: Create new notification preferences for a specific fridge
+      operationId: postUserFridgeNotification
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/FridgeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesInput'
+            examples:
+              emailOnly:
+                summary: Email notifications only
+                value:
+                  contactTypePreferences:
+                    email:
+                      good: true
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: false
+                      ghost: false
+                      foodLevel0: true
+                      foodLevel1: false
+                      foodLevel2: false
+                      foodLevel3: false
+              deviceOnly:
+                summary: Device push notifications only
+                value:
+                  contactTypePreferences:
+                    device:
+                      good: false
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: true
+                      ghost: true
+                      foodLevel0: true
+                      foodLevel1: true
+                      foodLevel2: false
+                      foodLevel3: false
+              both:
+                summary: Both email and device notifications
+                value:
+                  contactTypePreferences:
+                    email:
+                      good: true
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: true
+                      ghost: true
+                      foodLevel0: true
+                      foodLevel1: false
+                      foodLevel2: false
+                      foodLevel3: false
+                    device:
+                      good: false
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: true
+                      ghost: false
+                      foodLevel0: true
+                      foodLevel1: true
+                      foodLevel2: false
+                      foodLevel3: false
+      responses:
+        '201':
+          description: Successfully created notification preference
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFridgeNotification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Notifications
+      summary: Update notification preferences for a fridge
+      description: Update existing notification preferences for a specific fridge
+      operationId: patchUserFridgeNotification
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/FridgeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesInput'
+            examples:
+              updateEmail:
+                summary: Update email preferences
+                value:
+                  contactTypePreferences:
+                    email:
+                      good: false
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: true
+                      ghost: false
+                      foodLevel0: true
+                      foodLevel1: true
+                      foodLevel2: false
+                      foodLevel3: false
+              addDevice:
+                summary: Add device preferences
+                value:
+                  contactTypePreferences:
+                    email:
+                      good: true
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: false
+                      ghost: false
+                      foodLevel0: true
+                      foodLevel1: false
+                      foodLevel2: false
+                      foodLevel3: false
+                    device:
+                      good: true
+                      dirty: true
+                      outOfOrder: true
+                      notAtLocation: true
+                      ghost: true
+                      foodLevel0: true
+                      foodLevel1: true
+                      foodLevel2: true
+                      foodLevel3: true
+      responses:
+        '200':
+          description: Successfully updated notification preference
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFridgeNotification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Notifications
+      summary: Delete notification preferences for a fridge
+      description: Remove notification preferences for a specific fridge and user combination
+      operationId: deleteUserFridgeNotification
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/FridgeId'
+      responses:
+        '204':
+          description: Successfully deleted notification preference
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    FirebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Firebase JWT token. Include the token in the Authorization header as: `Bearer <token>`
+        
+        The token must be issued by Firebase Authentication and include:
+        - iss: https://securetoken.google.com/{projectId}
+        - aud: {projectId}
+        - sub: User's Firebase UID
+
+  parameters:
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      description: Firebase User ID (UID) - must match the authenticated user's ID
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 100
+        example: "abc123xyz456def789"
+
+    FridgeId:
+      name: fridge_id
+      in: path
+      required: true
+      description: Unique identifier for the community fridge
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 100
+        example: "fridge_123abc"
+
+  headers:
+    X-Request-ID:
+      description: Unique request identifier for tracing
+      schema:
+        type: string
+        example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+  schemas:
+    UserFridgeNotification:
+      type: object
+      required:
+        - userId
+        - fridgeId
+        - contactTypePreferences
+        - createdAt
+        - updatedAt
+      properties:
+        userId:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Firebase User ID
+          example: "abc123xyz456def789"
+        fridgeId:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Unique identifier for the community fridge
+          example: "fridge_123abc"
+        contactTypePreferences:
+          $ref: '#/components/schemas/ContactTypePreferences'
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp with milliseconds when the preference was created
+          example: "2025-12-13T10:30:45.123Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp with milliseconds when the preference was last updated
+          example: "2025-12-13T15:20:30.456Z"
+
+    NotificationPreferencesInput:
+      type: object
+      required:
+        - contactTypePreferences
+      properties:
+        contactTypePreferences:
+          $ref: '#/components/schemas/ContactTypePreferences'
+
+    ContactTypePreferences:
+      type: object
+      description: Notification preferences by contact method (email and/or device push)
+      properties:
+        email:
+          $ref: '#/components/schemas/FridgePreferences'
+        device:
+          $ref: '#/components/schemas/FridgePreferences'
+      minProperties: 1
+      example:
+        email:
+          good: true
+          dirty: true
+          outOfOrder: true
+          notAtLocation: false
+          ghost: false
+          foodLevel0: true
+          foodLevel1: false
+          foodLevel2: false
+          foodLevel3: false
+
+    FridgePreferences:
+      type: object
+      required:
+        - good
+        - foodLevel0
+      description: |
+        Notification preferences for different fridge states and food levels.
+        
+        Fridge States:
+        - good: Fridge is operational and in good condition
+        - dirty: Fridge needs cleaning
+        - outOfOrder: Fridge is broken or malfunctioning
+        - notAtLocation: Fridge has been moved or is missing
+        - ghost: Fridge doesn't exist at reported location
+        
+        Food Levels:
+        - foodLevel0: Empty (0%)
+        - foodLevel1: Low (1-33%)
+        - foodLevel2: Medium (34-66%)
+        - foodLevel3: Full (67-100%)
+      properties:
+        good:
+          type: boolean
+          description: Notify when fridge is reported as good/operational
+        dirty:
+          type: boolean
+          default: true
+          description: Notify when fridge is reported as dirty
+        outOfOrder:
+          type: boolean
+          default: true
+          description: Notify when fridge is reported as out of order
+        notAtLocation:
+          type: boolean
+          default: true
+          description: Notify when fridge is reported as not at its location
+        ghost:
+          type: boolean
+          default: true
+          description: Notify when fridge is reported as non-existent (ghost)
+        foodLevel0:
+          type: boolean
+          description: Notify when fridge is empty (0%)
+        foodLevel1:
+          type: boolean
+          description: Notify when fridge has low food (1-33%)
+        foodLevel2:
+          type: boolean
+          description: Notify when fridge has medium food (34-66%)
+        foodLevel3:
+          type: boolean
+          description: Notify when fridge is full (67-100%)
+      example:
+        good: true
+        dirty: true
+        outOfOrder: true
+        notAtLocation: false
+        ghost: false
+        foodLevel0: true
+        foodLevel1: false
+        foodLevel2: false
+        foodLevel3: false
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              enum:
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - MISSING_BODY
+                - INVALID_JSON
+                - VALIDATION_ERROR
+                - IMMUTABLE_FIELD
+                - MISSING_REQUIRED_FIELD
+                - NOT_FOUND
+                - ALREADY_EXISTS
+                - INTERNAL_SERVER_ERROR
+                - DATABASE_ERROR
+                - INVALID_HTTP_METHOD
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error message
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missingBody:
+              summary: Missing request body
+              value:
+                error:
+                  code: "MISSING_BODY"
+                  message: "Request body is required"
+            invalidJson:
+              summary: Invalid JSON
+              value:
+                error:
+                  code: "INVALID_JSON"
+                  message: "Invalid JSON in request body"
+            validationError:
+              summary: Validation error
+              value:
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "Input validation failed"
+
+    Unauthorized:
+      description: Authentication failed - invalid or missing JWT token
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Authentication failed: No sub found in JWT"
+
+    Forbidden:
+      description: Forbidden - user can only access their own data
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "FORBIDDEN"
+              message: "Unauthorized: User can only access their own data"
+
+    NotFound:
+      description: Resource not found
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Notification preference not found"
+
+    Conflict:
+      description: Resource already exists
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "ALREADY_EXISTS"
+              message: "Notification preference already exists for this user and fridge"
+
+    InternalServerError:
+      description: Internal server error
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "INTERNAL_SERVER_ERROR"
+              message: "An unexpected error occurred"
