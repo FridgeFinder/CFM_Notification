@@ -212,8 +212,18 @@ paths:
     patch:
       tags:
         - Notifications
-      summary: Update notification preferences for a fridge
-      description: Update existing notification preferences for a specific fridge
+      summary: Partially update notification preferences for a fridge
+      description: |
+        Partially update existing notification preferences for a specific fridge.
+        Only the fields provided in the request will be updated. Fields not included
+        will retain their current values. This allows for granular updates without
+        needing to send the complete preference object.
+        
+        Examples:
+        - Update only email preferences while leaving device preferences unchanged
+        - Update only specific fields within email preferences (e.g., just 'dirty')
+        - Add a new contact type (e.g., device) without affecting existing types
+        - Remove a contact type by setting it to null
       operationId: patchUserFridgeNotification
       parameters:
         - $ref: '#/components/parameters/UserId'
@@ -225,8 +235,16 @@ paths:
             schema:
               $ref: '#/components/schemas/NotificationPreferencesInput'
             examples:
-              updateEmail:
-                summary: Update email preferences
+              partialFieldUpdate:
+                summary: Update only specific fields within a contact type
+                description: Only updates the 'dirty' field in email preferences, all other fields remain unchanged
+                value:
+                  contactTypePreferences:
+                    email:
+                      dirty: false
+              updateEmailOnly:
+                summary: Update only email preferences
+                description: Updates all email preference fields, device preferences remain unchanged
                 value:
                   contactTypePreferences:
                     email:
@@ -241,18 +259,9 @@ paths:
                       foodLevel3: false
               addDevice:
                 summary: Add device preferences
+                description: Adds device preferences while keeping existing email preferences unchanged
                 value:
                   contactTypePreferences:
-                    email:
-                      good: true
-                      dirty: true
-                      outOfOrder: true
-                      notAtLocation: false
-                      ghost: false
-                      foodLevel0: true
-                      foodLevel1: false
-                      foodLevel2: false
-                      foodLevel3: false
                     device:
                       good: true
                       dirty: true
@@ -263,6 +272,23 @@ paths:
                       foodLevel1: true
                       foodLevel2: true
                       foodLevel3: true
+              updateBothContactTypes:
+                summary: Update both email and device preferences
+                description: Updates specific fields in both email and device contact types simultaneously
+                value:
+                  contactTypePreferences:
+                    email:
+                      dirty: false
+                      ghost: false
+                    device:
+                      good: true
+                      foodLevel0: false
+              removeContactType:
+                summary: Remove a contact type
+                description: Sets email to null to remove email notifications
+                value:
+                  contactTypePreferences:
+                    email: null
       responses:
         '200':
           description: Successfully updated notification preference
@@ -580,7 +606,7 @@ components:
           example:
             error:
               code: "NOT_FOUND"
-              message: "Notification preference not found"
+              message: "User Fridge Notification preference not found"
 
     Conflict:
       description: Resource already exists
