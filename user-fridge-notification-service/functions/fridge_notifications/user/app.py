@@ -74,7 +74,7 @@ def validate_request_parameters(
         Error response dict if validation fails, None if all validations pass
     """
     # Should never get here if API Gateway JWT authorizer is configured correctly
-    if not authenticated_user_id:
+    if not authenticated_user_id or not authenticated_user_id.strip():
         return error_response(
             500, "Authentication failed: No sub found in JWT", 
             ErrorCode.INTERNAL_SERVER_ERROR,
@@ -84,7 +84,7 @@ def validate_request_parameters(
         )
     
     # Validate required path parameters
-    if not fridge_id:
+    if not fridge_id or not fridge_id.strip():
         return error_response(
             400, "Missing required path parameter: fridge_id", 
             ErrorCode.MISSING_REQUIRED_FIELD,
@@ -93,7 +93,7 @@ def validate_request_parameters(
             extra={"user_id": user_id, "path": path}
         )
     
-    if not user_id:
+    if not user_id or not user_id.strip():
         return error_response(
             400, "Missing required path parameter: user_id", 
             ErrorCode.MISSING_REQUIRED_FIELD,
@@ -160,9 +160,9 @@ def handle_post_request(event: dict, userId: str, fridgeId: str, request_id: str
         model = UserFridgeNotificationModel(**body_dict)
         return service.post_user_fridge_notification(user_notification_model=model, request_id=request_id)
     except json.JSONDecodeError:
-        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON)
+        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
     except ValidationError as ve:
-        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR)
+        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
 
 
 def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: str) -> dict:
@@ -181,14 +181,14 @@ def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: st
     """
     body = event.get("body")
     if not body:
-        return error_response(400, "Missing request body", ErrorCode.MISSING_BODY)
+        return error_response(400, "Missing request body", ErrorCode.MISSING_BODY, request_id=request_id)
     
     try:
         body_dict = json.loads(body)
         # Only contactTypePreferences can be updated
         contactTypePreferences = body_dict.get("contactTypePreferences")
         if not contactTypePreferences:
-            return error_response(400, "contactTypePreferences is required", ErrorCode.MISSING_REQUIRED_FIELD)
+            return error_response(400, "contactTypePreferences is required", ErrorCode.MISSING_REQUIRED_FIELD, request_id=request_id)
         
         return service.patch_user_fridge_notification(
             userId=userId,
@@ -197,9 +197,9 @@ def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: st
             request_id=request_id
         )
     except json.JSONDecodeError:
-        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON)
+        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
     except ValidationError as ve:
-        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR)
+        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
 
 
 def handle_delete_request(userId: str, fridgeId: str, request_id: str) -> dict:
@@ -226,7 +226,6 @@ def lambda_handler(event, context):
     Returns:
         API Gateway formatted response
     """
-    # Extract request details
     request_id = context.aws_request_id if context else 'unknown'
     authenticated_user_id = get_authenticated_user_id(event) 
     http_method = event.get("requestContext", {}).get("http", {}).get("method")

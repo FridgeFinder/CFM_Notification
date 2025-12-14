@@ -1,5 +1,6 @@
 from xml.parsers.expat import model
 from botocore.exceptions import ClientError
+from pydantic import ValidationError
 import logging
 
 try:
@@ -81,9 +82,12 @@ class UserFridgeNotificationService:
             # Save updated model
             self.repository.update(ufn_model)
             return success_response(200, ufn_model.model_dump(mode="json"), request_id=request_id)
+        except ValidationError as ve:
+            # Pydantic validation error when validating contactTypePreferences
+            return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
         except ClientError as e:
             if e.response['Error'].get('Code') == "ConditionalCheckFailedException":
-                # Super Duper Unlikely: Item was deleted between get and update (race condition)
+                # Super Duper Unlikely: Item was deleted between get and update
                 return error_response(404, "User Fridge Notification not found", ErrorCode.NOT_FOUND, request_id=request_id)
             raise
 

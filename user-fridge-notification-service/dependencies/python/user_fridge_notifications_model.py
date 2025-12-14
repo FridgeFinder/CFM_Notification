@@ -49,4 +49,4 @@ class UserFridgeNotificationModel(BaseModel):
         """
         # Pydantic will validate the input when we create the model
         self.contactTypePreferences = ContactTypePreferencesModel(**contactTypePreferences)
-        self.updatedAt = datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+        self.updatedAt = get_utc_timestamp()

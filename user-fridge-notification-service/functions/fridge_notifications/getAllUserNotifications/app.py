@@ -47,10 +47,10 @@ def validate_input(user_id: str, authenticated_user_id: str, request_id: str, pa
             extra={'path': path}
         )
     
-    if not user_id:
+    if not user_id or not user_id.strip():
         return error_response(
-            500, "Missing required path parameter: user_id",
-            ErrorCode.INTERNAL_SERVER_ERROR,
+            400, "Missing required path parameter: user_id",
+            ErrorCode.MISSING_REQUIRED_FIELD,
             request_id=request_id,
             log_level="error",
             extra={"path": path}
