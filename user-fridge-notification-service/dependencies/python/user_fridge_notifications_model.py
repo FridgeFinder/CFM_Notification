@@ -50,3 +50,40 @@ class UserFridgeNotificationModel(BaseModel):
         # Pydantic will validate the input when we create the model
         self.contactTypePreferences = ContactTypePreferencesModel(**contactTypePreferences)
         self.updatedAt = get_utc_timestamp()
+    
+    def patch_preferences(self, partialContactTypePreferences: dict) -> None:
+        """
+        Partially update contact type preferences, only modifying fields that are provided.
+        Preserves existing values for fields not included in the partial update.
+        
+        Args:
+            partialContactTypePreferences: Partial preferences dict with only the fields to update
+            
+        Examples:
+            # Update only email preferences, leaving device unchanged
+            model.patch_preferences({"email": {"dirty": True, "good": False, ...}})
+            
+            # Update only the 'dirty' field within email preferences
+            model.patch_preferences({"email": {"dirty": True}})
+        """
+        # Start with current preferences as dict
+        current_prefs = self.contactTypePreferences.model_dump()
+        
+        # Iterate over provided contact types (e.g., 'email', 'device')
+        for contact_type, partial_prefs in partialContactTypePreferences.items():
+            if partial_prefs is None:
+                current_prefs[contact_type] = None
+                continue
+
+            if current_prefs.get(contact_type) is not None:
+                # Contact type exists, merge the partial preferences
+                for field, value in partial_prefs.items():
+                    current_prefs[contact_type][field] = value
+            else:
+                # Contact type doesn't exist yet, validate and set it
+                # Pydantic will validate this has all required fields
+                current_prefs[contact_type] = partial_prefs
+        
+        # Validate the merged result and update
+        self.contactTypePreferences = ContactTypePreferencesModel(**current_prefs)
+        self.updatedAt = get_utc_timestamp()

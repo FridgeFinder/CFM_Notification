@@ -77,7 +77,7 @@ class UserFridgeNotificationService:
             
             # Convert to model to leverage validation and helper, update preferences
             ufn_model = UserFridgeNotificationModel(**ufn_dict)
-            ufn_model.update_preferences(contactTypePreferences)
+            ufn_model.patch_preferences(contactTypePreferences)
             
             # Save updated model
             self.repository.update(ufn_model)
