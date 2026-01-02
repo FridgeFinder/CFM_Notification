@@ -120,6 +120,13 @@ URL format: `v1/users/{user_id}/fridge-notifications`
 sam local invoke GetAllUserFridgeNotificationsFunction --event events/get_all_user_notifications.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
 ```
 
+#### User Deletion Handler
+Cleans up notifications when a user is deleted:
+
+```bash
+Notification$ sam local invoke UserDeletionHandlerFunction --event events/user_deletion_event.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
+```
+
 ---
 ## Running Unit Tests
 

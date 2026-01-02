@@ -252,6 +252,57 @@ Resources:
             BatchSize: 1
             Enabled: true
 
+  UserDeletionHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/user_deletion_handler
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      FunctionName: !Sub UserDeletionHandlerFunction${Environment}
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            - dynamodb:DeleteItem
+            Resource: !GetAtt UserFridgeNotificationsTable.Arn
+
+  ##########################
+  ##   EventBridge Rule   ##
+  ##########################
+
+  UserDeletionEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub user-deletion-notification-cleanup-${Environment}
+      Description: Triggers notification cleanup when a user is deleted
+      EventBusName:
+        Fn::ImportValue: !Sub user-service-${Environment}-EventBusName
+      EventPattern:
+        source:
+          - user-service
+        detail-type:
+          - User Deleted
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt UserDeletionHandlerFunction.Arn
+          Id: UserDeletionHandlerTarget
+
+  UserDeletionEventRulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UserDeletionHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UserDeletionEventRule.Arn
+
   ##########################
   ##    DynamoDB Tables    ##
   ##########################
