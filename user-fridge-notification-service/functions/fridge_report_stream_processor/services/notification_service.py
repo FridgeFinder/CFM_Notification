@@ -26,25 +26,142 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
         if not formated_alert:
             logger.info(f"User {email} does not want email notifications for this condition/food level")
             return
-        subject = f"FridgeFinder Alert: {fridge_id} - {formated_alert}"
-        body = f"""    
-        Hello, a fridge you are subscribed to has an update:
-
+        
+        # Map conditions to emojis
+        emoji_map = {
+            'good': '✅',
+            'dirty': '🧹',
+            'outOfOrder': '⚠️',
+            'notAtLocation': '📍',
+            'ghost': '👻'
+        }
+        condition_emoji = emoji_map.get(formated_fridge_condition, '📢')
+        
+        subject = f"{condition_emoji} FridgeFinder Alert: {fridge_id}"
+        
+        # HTML email body with inline CSS for email client compatibility
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+            <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 20px 0;">
+                        <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <!-- Header with Logo -->
+                            <tr>
+                                <td style="padding: 30px 20px; text-align: center; background: linear-gradient(135deg, #88B3FF 0%, #6B9FFF 100%); border-radius: 8px 8px 0 0;">
+                                    <img src="https://fridgefinder-assets.s3.amazonaws.com/email/logo.png" alt="FridgeFinder" style="max-width: 112px; height: auto; display: block; margin: 0 auto;" />
+                                </td>
+                            </tr>
+                            
+                            <!-- Main Content -->
+                            <tr>
+                                <td style="padding: 40px 30px;">
+                                    <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.5;">
+                                        Hi! 👋
+                                    </p>
+                                    <p style="margin: 0 0 25px 0; color: #333333; font-size: 16px; line-height: 1.5;">
+                                        A fridge you're following has a status update:
+                                    </p>
+                                    
+                                    <!-- Alert Box -->
+                                    <table role="presentation" style="width: 100%; background-color: #f8f9fa; border-left: 4px solid #88B3FF; border-radius: 4px; margin-bottom: 25px;">
+                                        <tr>
+                                            <td style="padding: 20px;">
+                                                <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    Fridge ID
+                                                </p>
+                                                <p style="margin: 0 0 15px 0; color: #333333; font-size: 18px; font-weight: 600;">
+                                                    {fridge_id}
+                                                </p>
+                                                <p style="margin: 0 0 5px 0; color: #666666; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                    Update
+                                                </p>
+                                                <p style="margin: 0; color: #333333; font-size: 16px;">
+                                                    {formated_alert}
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <!-- CTA Button -->
+                                    <table role="presentation" style="margin: 0 auto;">
+                                        <tr>
+                                            <td style="border-radius: 25px; background: #5B8FEE; box-shadow: 0 4px 6px rgba(91, 143, 238, 0.4);">
+                                                <a href="{base_url}/fridge/{fridge_id}" style="display: inline-block; padding: 16px 48px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">
+                                                    View Status Update
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                                    <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px;">
+                                        Stay connected with your community fridges 🍏
+                                    </p>
+                                    <p style="margin: 0 0 15px 0; color: #999999; font-size: 11px; line-height: 1.4;">
+                                        This is an automated notification. Please do not reply to this email.
+                                    </p>
+                                    <p style="margin: 0 0 15px 0; color: #999999; font-size: 11px; line-height: 1.4;">
+                                        You received this because you subscribed to updates for this community fridge.
+                                    </p>
+                                    <p style="margin: 0 0 15px 0; color: #999999; font-size: 12px;">
+                                        <a href="{base_url}/preferences" style="color: #88B3FF; text-decoration: none;">Manage Preferences</a>
+                                        &nbsp;|&nbsp;
+                                        <a href="{base_url}/privacy" style="color: #88B3FF; text-decoration: none;">Privacy Policy</a>
+                                        &nbsp;|&nbsp;
+                                        <a href="{base_url}/support" style="color: #88B3FF; text-decoration: none;">Contact Support</a>
+                                        &nbsp;|&nbsp;
+                                        <a href="{base_url}/unsubscribe?token=eyJhbGciOiJ" style="color: #88B3FF; text-decoration: none;">Unsubscribe</a>
+                                    </p>
+                                    <p style="margin: 0; color: #999999; font-size: 11px;">
+                                        © 2026 FridgeFinder. All rights reserved.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+        
+        # Plain text fallback for email clients that don't support HTML
+        text_body = f"""
+        Hi!
+        
+        A fridge you're following has a status update:
+        
         Fridge ID: {fridge_id}
         Update: {formated_alert}
         
-        Please check the Fridge Finder app for more details: {base_url}/fridge/{fridge_id}
-
+        View details: {base_url}/fridge/{fridge_id}
+        
+        Stay connected with your local community fridges!
+        
         ---
         Unsubscribe: {base_url}/unsubscribe?token=eyJhbGciOiJ
         """
 
         ses.send_email(
-            Source='fridge_alerts@fridgefinder.app',  # Update with your verified SES email
+            Source='fridge_alerts@fridgefinder.app',
             Destination={'ToAddresses': [email]},
             Message={
                 'Subject': {'Data': subject},
-                'Body': {'Text': {'Data': body}}
+                'Body': {
+                    'Text': {'Data': text_body},
+                    'Html': {'Data': html_body}
+                }
             }
         )
         logger.info(f"Email sent successfully to {email}")
