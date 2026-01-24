@@ -21,10 +21,8 @@ class TestUserFridgeNotificationApi(unittest.TestCase):
                     "outOfOrder": True,
                     "notAtLocation": True,
                     "ghost": True,
-                    "foodLevel0": True,
-                    "foodLevel1": True,
-                    "foodLevel2": True,
-                    "foodLevel3": True,
+                    "noFood": True,
+                    "hasFood": True,
                     "cleaned": True
                 }
             }

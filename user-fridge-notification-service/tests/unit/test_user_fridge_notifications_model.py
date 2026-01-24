@@ -16,10 +16,8 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
             outOfOrder=True,
             notAtLocation=True,
             ghost=True,
-            foodLevel0=True,
-            foodLevel1=True,
-            foodLevel2=True,
-            foodLevel3=True,
+            noFood=True,
+            hasFood=True,
             cleaned=True,
         )
 
@@ -70,7 +68,7 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
         # all other fields should remain unchanged
         self.assertEqual(model.contactTypePreferences.email.good, True)
         self.assertEqual(model.contactTypePreferences.email.outOfOrder, True)
-        self.assertEqual(model.contactTypePreferences.email.foodLevel0, True)
+        self.assertEqual(model.contactTypePreferences.email.noFood, True)
 
     def test_patch_preferences_update_multiple_fields(self):
         """Test updating multiple fields within a contact type"""
@@ -96,7 +94,7 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
         self.assertEqual(model.contactTypePreferences.email.ghost, False)
         # Unchanged fields
         self.assertEqual(model.contactTypePreferences.email.outOfOrder, True)
-        self.assertEqual(model.contactTypePreferences.email.foodLevel0, True)
+        self.assertEqual(model.contactTypePreferences.email.noFood, True)
 
     def test_patch_preferences_add_new_contact_type(self):
         """Test adding a new contact type while preserving existing ones"""
@@ -114,10 +112,8 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
             outOfOrder=False,
             notAtLocation=False,
             ghost=False,
-            foodLevel0=False,
-            foodLevel1=False,
-            foodLevel2=False,
-            foodLevel3=False,
+            noFood=False,
+            hasFood=False,
         )
         model.patch_preferences({"device": device_prefs.model_dump()})
         

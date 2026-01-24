@@ -37,6 +37,10 @@ Parameters:
   FirebaseProjectId:
     Type: String
     Description: Firebase Project ID for authentication
+  FirebaseSecretName:
+    Type: String
+    Description: Name of the secret in AWS Secrets Manager containing Firebase credentials
+    Default: firebase-service-account-dev
 
 
 Resources:
@@ -225,6 +229,11 @@ Resources:
       Handler: app.lambda_handler
       Runtime: python3.13
       FunctionName: !Sub FridgeReportStreamProcessorFunction${Environment}
+      ReservedConcurrentExecutions: 5
+      Environment:
+        Variables:
+          USERS_TABLE_NAME: !Sub users_${Environment}
+          FIREBASE_SECRET_NAME: !Ref FirebaseSecretName
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -242,6 +251,25 @@ Resources:
             - dynamodb:ListStreams
             Resource:
               Fn::ImportValue: !Sub "FridgeReportStreamArn-${Environment}"
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            Resource:
+              - !GetAtt UserFridgeNotificationsTable.Arn
+              - !Sub "${UserFridgeNotificationsTable.Arn}/index/*"
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users_${Environment}"
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:firebase-service-account-*'
       Events:
         FridgeReportStream:
           Type: DynamoDB

@@ -126,4 +126,4 @@ marimo/_lsp/
 __marimo__/
 
 # === Docker Volumes
-volume/
+volume/firebase-service-account-*.json

@@ -27,6 +27,6 @@
       }
     }
   },
-  "body": "{\n  \"contactTypePreferences\": {\"email\": {\"good\": true, \"dirty\": true, \"outOfOrder\": true, \"notAtLocation\": true, \"ghost\": true, \"foodLevel0\": false, \"foodLevel1\": false, \"foodLevel2\": true, \"foodLevel3\": true}}\n}",
+  "body": "{\n  \"contactTypePreferences\": {\"email\": {\"good\": true, \"dirty\": true, \"outOfOrder\": true, \"notAtLocation\": true, \"ghost\": true, \"noFood\": false, \"hasFood\": true}}\n}",
   "isBase64Encoded": false
 }

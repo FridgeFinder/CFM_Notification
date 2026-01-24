@@ -1,0 +1,49 @@
+{
+  "Records": [
+    {
+      "eventID": "1",
+      "eventName": "INSERT",
+      "eventVersion": "1.1",
+      "eventSource": "aws:dynamodb",
+      "awsRegion": "us-east-1",
+      "dynamodb": {
+        "ApproximateCreationDateTime": 1737676800,
+        "Keys": {
+          "fridge_id": {
+            "S": "fridge_1"
+          },
+          "report_id": {
+            "S": "report-001"
+          }
+        },
+        "NewImage": {
+          "fridge_id": {
+            "S": "fridge_1"
+          },
+          "report_id": {
+            "S": "report-001"
+          },
+          "status": {
+            "S": "submitted"
+          },
+          "reported_by": {
+            "S": "user-123"
+          },
+          "issue_type": {
+            "S": "dirty"
+          },
+          "description": {
+            "S": "Fridge needs cleaning"
+          },
+          "timestamp": {
+            "N": "1737676800"
+          }
+        },
+        "SequenceNumber": "111",
+        "SizeBytes": 26,
+        "StreamViewType": "NEW_AND_OLD_IMAGES"
+      },
+      "eventSourceARN": "arn:aws:dynamodb:us-east-1:123456789012:table/FridgeReports/stream/2026-01-14T00:00:00.000"
+    }
+  ]
+}

@@ -146,10 +146,8 @@ paths:
                       outOfOrder: true
                       notAtLocation: false
                       ghost: false
-                      foodLevel0: true
-                      foodLevel1: false
-                      foodLevel2: false
-                      foodLevel3: false
+                      noFood: true
+                      hasFood: false
               deviceOnly:
                 summary: Device push notifications only
                 value:
@@ -160,10 +158,8 @@ paths:
                       outOfOrder: true
                       notAtLocation: true
                       ghost: true
-                      foodLevel0: true
-                      foodLevel1: true
-                      foodLevel2: false
-                      foodLevel3: false
+                      noFood: true
+                      hasFood: true
               both:
                 summary: Both email and device notifications
                 value:
@@ -174,20 +170,16 @@ paths:
                       outOfOrder: true
                       notAtLocation: true
                       ghost: true
-                      foodLevel0: true
-                      foodLevel1: false
-                      foodLevel2: false
-                      foodLevel3: false
+                      noFood: true
+                      hasFood: false
                     device:
                       good: false
                       dirty: true
                       outOfOrder: true
                       notAtLocation: true
                       ghost: false
-                      foodLevel0: true
-                      foodLevel1: true
-                      foodLevel2: false
-                      foodLevel3: false
+                      noFood: true
+                      hasFood: true
       responses:
         '201':
           description: Successfully created notification preference
@@ -253,10 +245,8 @@ paths:
                       outOfOrder: true
                       notAtLocation: true
                       ghost: false
-                      foodLevel0: true
-                      foodLevel1: true
-                      foodLevel2: false
-                      foodLevel3: false
+                      noFood: true
+                      hasFood: true
               addDevice:
                 summary: Add device preferences
                 description: Adds device preferences while keeping existing email preferences unchanged
@@ -268,10 +258,8 @@ paths:
                       outOfOrder: true
                       notAtLocation: true
                       ghost: true
-                      foodLevel0: true
-                      foodLevel1: true
-                      foodLevel2: true
-                      foodLevel3: true
+                      noFood: true
+                      hasFood: true
               updateBothContactTypes:
                 summary: Update both email and device preferences
                 description: Updates specific fields in both email and device contact types simultaneously
@@ -282,7 +270,7 @@ paths:
                       ghost: false
                     device:
                       good: true
-                      foodLevel0: false
+                      noFood: false
               removeContactType:
                 summary: Remove a contact type
                 description: Sets email to null to remove email notifications
@@ -437,16 +425,14 @@ components:
           outOfOrder: true
           notAtLocation: false
           ghost: false
-          foodLevel0: true
-          foodLevel1: false
-          foodLevel2: false
-          foodLevel3: false
+          noFood: true
+          hasFood: false
 
     FridgePreferences:
       type: object
       required:
         - good
-        - foodLevel0
+        - noFood
       description: |
         Notification preferences for different fridge states and food levels.
         
@@ -458,10 +444,8 @@ components:
         - ghost: Fridge doesn't exist at reported location
         
         Food Levels:
-        - foodLevel0: Empty (0%)
-        - foodLevel1: Low (1-33%)
-        - foodLevel2: Medium (34-66%)
-        - foodLevel3: Full (67-100%)
+        - noFood: Food Level 0
+        - hasFood: Food Levels 1-3
       properties:
         good:
           type: boolean
@@ -482,28 +466,20 @@ components:
           type: boolean
           default: true
           description: Notify when fridge is reported as non-existent (ghost)
-        foodLevel0:
+        noFood:
           type: boolean
           description: Notify when fridge is empty (0%)
-        foodLevel1:
+        hasFood:
           type: boolean
-          description: Notify when fridge has low food (1-33%)
-        foodLevel2:
-          type: boolean
-          description: Notify when fridge has medium food (34-66%)
-        foodLevel3:
-          type: boolean
-          description: Notify when fridge is full (67-100%)
+          description: Notify when fridge has food
       example:
         good: true
         dirty: true
         outOfOrder: true
         notAtLocation: false
         ghost: false
-        foodLevel0: true
-        foodLevel1: false
-        foodLevel2: false
-        foodLevel3: false
+        noFood: true
+        hasFood: false
 
     ErrorResponse:
       type: object

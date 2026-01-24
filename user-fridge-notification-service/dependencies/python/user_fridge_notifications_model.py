@@ -18,10 +18,8 @@ class FridgePreferencesModel(BaseModel):
     outOfOrder: bool = True
     notAtLocation: bool = True
     ghost: bool = True
-    foodLevel0: bool
-    foodLevel1: bool
-    foodLevel2: bool
-    foodLevel3: bool
+    noFood: bool
+    hasFood: bool
 
 class ContactTypePreferencesModel(BaseModel):
     model_config = ConfigDict(extra="forbid") # Forbid extra fields
