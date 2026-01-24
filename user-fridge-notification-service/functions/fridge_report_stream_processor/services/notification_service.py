@@ -2,6 +2,7 @@
 Notification service for sending email and push notifications.
 """
 import logging
+import os
 from typing import Optional
 import firebase_admin
 from firebase_admin import messaging
@@ -12,6 +13,10 @@ logger = logging.getLogger()
 
 # Initialize SES client
 ses = get_ses_connection()
+
+# Get environment for URL construction
+environment = os.environ.get('ENVIRONMENT', 'dev')
+base_url = "https://www.fridgefinder.app" if environment == 'prod' else f"https://{environment}.fridgefinder.app"
 
 
 def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fridge_condition: str, formated_food_condition: str, food_level: int):
@@ -28,10 +33,10 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
         Fridge ID: {fridge_id}
         Update: {formated_alert}
         
-        Please check the Fridge Finder app for more details: https://www.fridgefinder.app/fridge/{fridge_id}
+        Please check the Fridge Finder app for more details: {base_url}/fridge/{fridge_id}
 
         ---
-        Unsubscribe: https://www.fridgefinder.app/unsubscribe?token=eyJhbGciOiJ
+        Unsubscribe: {base_url}/unsubscribe?token=eyJhbGciOiJ
         """
 
         ses.send_email(
