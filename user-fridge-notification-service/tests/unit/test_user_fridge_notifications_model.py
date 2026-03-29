@@ -1,7 +1,5 @@
 import unittest
-from datetime import datetime
-from unittest.mock import patch
-from Notification.dependencies.python.user_fridge_notifications_model import (
+from user_fridge_notifications_model import (
     UserFridgeNotificationModel,
     ContactTypePreferencesModel,
     FridgePreferencesModel,
@@ -18,11 +16,10 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
             ghost=True,
             noFood=True,
             hasFood=True,
-            cleaned=True,
         )
 
     def test_model_happy_path(self):
-        contact_types_preferences = ContactTypePreferencesModel(sms=self.fridge_prefs, email=self.fridge_prefs)
+        contact_types_preferences = ContactTypePreferencesModel(device=self.fridge_prefs, email=self.fridge_prefs)
 
         model = UserFridgeNotificationModel(
             userId="user_123",
@@ -48,7 +45,6 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
         self.assertEqual(model.userId, "user_123")
         self.assertEqual(model.fridgeId, "fridge_123")
         self.assertIsNone(model.contactTypePreferences.email)
-        self.assertIsNone(model.contactTypePreferences.sms)
         self.assertIsNone(model.contactTypePreferences.device)
 
     def test_patch_preferences_partial_field_update(self):
@@ -211,7 +207,3 @@ class TestUserFridgeNotificationModel(unittest.TestCase):
         
         # updatedAt should have changed
         self.assertNotEqual(model.updatedAt, original_updated_at)
-
-
-if __name__ == "__main__":
-    unittest.main()

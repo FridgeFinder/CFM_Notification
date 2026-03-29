@@ -1,152 +1,145 @@
+import json
 import unittest
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
+from unittest.mock import MagicMock
 from botocore.exceptions import ClientError
-from Notification.dependencies.python.user_fridge_notifications_api import UserFridgeNotificationApi, ApiResponse
-from Notification.dependencies.python.user_fridge_notifications_model import UserFridgeNotificationModel
 
-class TestUserFridgeNotificationApi(unittest.TestCase):
+from user_fridge_notifications_service import UserFridgeNotificationService
+from user_fridge_notifications_model import UserFridgeNotificationModel
+
+
+class TestUserFridgeNotificationService(unittest.TestCase):
     def setUp(self):
-        self.mock_db_client = MagicMock()
-        self.api = UserFridgeNotificationApi(db_client=self.mock_db_client)
+        self.mock_repository = MagicMock()
+        self.service = UserFridgeNotificationService(repository=self.mock_repository)
         self.user_id = "user_1"
         self.fridge_id = "fridge_1"
+        self.sms_prefs = {
+            "good": True,
+            "dirty": True,
+            "outOfOrder": True,
+            "notAtLocation": True,
+            "ghost": True,
+            "noFood": True,
+            "hasFood": True,
+        }
+        self.item_dict = {
+            "userId": self.user_id,
+            "fridgeId": self.fridge_id,
+            "contactTypePreferences": {"email": self.sms_prefs},
+        }
         self.model = UserFridgeNotificationModel(
             userId=self.user_id,
             fridgeId=self.fridge_id,
-            contactTypePreferences={
-                "sms": {
-                    "good": True,
-                    "dirty": True,
-                    "outOfOrder": True,
-                    "notAtLocation": True,
-                    "ghost": True,
-                    "noFood": True,
-                    "hasFood": True,
-                    "cleaned": True
-                }
-            }
+            contactTypePreferences={"email": self.sms_prefs},
         )
+
+    # --- GET ---
 
     def test_get_user_fridge_notification_found(self):
-        # Mock DynamoDB get_item response
-        self.mock_db_client.get_item.return_value = {
-            "Item": {"userId": {"S": self.user_id}, "fridgeId": {"S": self.fridge_id}, "contact_info": {"M": {}}}
-        }
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dynamodb_to_dict", return_value={"userId": self.user_id, "fridgeId": self.fridge_id}):
-            response = self.api.get_user_fridge_notification(self.user_id, self.fridge_id)
-            self.assertEqual(response.status_code, 200)
-            self.assertIn("userId", response.body)
+        self.mock_repository.get.return_value = self.item_dict
+        response = self.service.get_user_fridge_notification(self.user_id, self.fridge_id)
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["userId"], self.user_id)
+        self.assertEqual(body["fridgeId"], self.fridge_id)
 
     def test_get_user_fridge_notification_not_found(self):
-        self.mock_db_client.get_item.return_value = {}
-        response = self.api.get_user_fridge_notification(self.user_id, self.fridge_id)
-        self.assertEqual(response.status_code, 404)
+        self.mock_repository.get.return_value = None
+        response = self.service.get_user_fridge_notification(self.user_id, self.fridge_id)
+        self.assertEqual(response["statusCode"], 404)
+        body = json.loads(response["body"])
+        self.assertEqual(body["error"]["message"], "Item not found")
+        self.assertEqual(body["error"]["code"], "ITEM_NOT_FOUND")
+
+    # --- POST ---
 
     def test_post_user_fridge_notification_success(self):
-        self.mock_db_client.put_item.return_value = {}
-        mock_dict = {"userId": self.user_id, "fridgeId": self.fridge_id}
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dict_to_dynamodb", return_value={}), \
-             patch("pydantic.BaseModel.model_dump", return_value=mock_dict):
-            response = self.api.post_user_fridge_notification(self.model)
-            self.assertEqual(response.status_code, 201)
+        self.mock_repository.create.return_value = None
+        response = self.service.post_user_fridge_notification(self.model)
+        self.assertEqual(response["statusCode"], 201)
+        body = json.loads(response["body"])
+        self.assertEqual(body["userId"], self.user_id)
+        self.assertEqual(body["fridgeId"], self.fridge_id)
 
     def test_post_user_fridge_notification_conflict(self):
-        self.mock_db_client.exceptions.ConditionalCheckFailedException = ClientError
-        self.mock_db_client.put_item.side_effect = ClientError(
+        self.mock_repository.create.side_effect = ClientError(
             error_response={"Error": {"Code": "ConditionalCheckFailedException"}},
-            operation_name="PutItem"
+            operation_name="PutItem",
         )
-        mock_dict = {"userId": self.user_id, "fridgeId": self.fridge_id}
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dict_to_dynamodb", return_value={}), \
-             patch("pydantic.BaseModel.model_dump", return_value=mock_dict):
-            response = self.api.post_user_fridge_notification(self.model)
-            self.assertEqual(response.status_code, 409)
-
-    def test_put_user_fridge_notification_not_found(self):
-        self.mock_db_client.get_item.return_value = {}
-        response = self.api.put_user_fridge_notification(self.model)
-        self.assertEqual(response.status_code, 404)
-
-    def test_put_user_fridge_notification_success(self):
-        self.mock_db_client.get_item.return_value = {"Item": {"createdAt": datetime.now(timezone.utc).isoformat()}}
-        self.mock_db_client.put_item.return_value = {}
-        mock_dict = {"userId": self.user_id, "fridgeId": self.fridge_id}
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dynamodb_to_dict", return_value={"createdAt": datetime.now(timezone.utc).isoformat()}), \
-             patch("pydantic.BaseModel.model_dump", return_value=mock_dict):
-            response = self.api.put_user_fridge_notification(self.model)
-            self.assertEqual(response.status_code, 200)
+        response = self.service.post_user_fridge_notification(self.model)
+        self.assertEqual(response["statusCode"], 409)
+        body = json.loads(response["body"])
+        self.assertEqual(body["error"]["message"], "UserFridgeNotification with userId: user_1, and fridgeId: fridge_1 already exists")
+        self.assertEqual(body["error"]["code"], "ITEM_ALREADY_EXISTS")
 
     def test_post_user_fridge_notification_db_error(self):
-        error = ClientError(
+        self.mock_repository.create.side_effect = ClientError(
             error_response={"Error": {"Code": "InternalServerError", "Message": "Database Error"}},
-            operation_name="PutItem"
+            operation_name="PutItem",
         )
-        self.mock_db_client.put_item.side_effect = error
-        mock_dict = {"userId": self.user_id, "fridgeId": self.fridge_id}
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dict_to_dynamodb", return_value={}), \
-            patch("pydantic.BaseModel.model_dump", return_value=mock_dict):
-            response = self.api.post_user_fridge_notification(self.model)
-            self.assertEqual(response.status_code, 500)
-            self.assertEqual(response.body, {"message": "Database Error"})
+        with self.assertRaises(ClientError):
+            self.service.post_user_fridge_notification(self.model)
 
-    def test_put_user_fridge_notification_db_error(self):
-        # Simulate existing item returned by get_item
-        self.mock_db_client.get_item.return_value = {"Item": {"createdAt": datetime.now(timezone.utc).isoformat()}}
-        # Simulate DynamoDB put_item raising a ClientError
-        error = ClientError(
+    # --- PATCH ---
+
+    def test_patch_user_fridge_notification_success(self):
+        self.mock_repository.get.return_value = self.item_dict
+        self.mock_repository.update.return_value = None
+        new_prefs = {"email": {k: False for k in self.sms_prefs}}
+        response = self.service.patch_user_fridge_notification(
+            self.user_id, self.fridge_id, new_prefs
+        )
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertFalse(body["contactTypePreferences"]["email"]["good"])
+
+    def test_patch_user_fridge_notification_not_found(self):
+        self.mock_repository.get.return_value = None
+        response = self.service.patch_user_fridge_notification(
+            self.user_id, self.fridge_id, {"email": self.sms_prefs}
+        )
+        self.assertEqual(response["statusCode"], 404)
+        body = json.loads(response["body"])
+        self.assertEqual(body["error"]["message"], "User Fridge Notification not found")
+        self.assertEqual(body["error"]["code"], "ITEM_NOT_FOUND")
+
+    def test_patch_user_fridge_notification_db_error(self):
+        self.mock_repository.get.return_value = self.item_dict
+        self.mock_repository.update.side_effect = ClientError(
             error_response={"Error": {"Code": "InternalServerError", "Message": "Database Error"}},
-            operation_name="PutItem"
+            operation_name="PutItem",
         )
-        self.mock_db_client.put_item.side_effect = error
-        mock_dict = {"userId": self.user_id, "fridgeId": self.fridge_id}
-        with patch("Notification.dependencies.python.user_fridge_notifications_api.dynamodb_to_dict", return_value={"createdAt": datetime.now(timezone.utc).isoformat()}), \
-             patch("pydantic.BaseModel.model_dump", return_value=mock_dict):
-            response = self.api.put_user_fridge_notification(self.model)
-            self.assertEqual(response.status_code, 500)
-            self.assertEqual(response.body, {"message": "Database Error"})
+        with self.assertRaises(ClientError):
+            self.service.patch_user_fridge_notification(
+                self.user_id, self.fridge_id, {"email": {k: False for k in self.sms_prefs}}
+            )
 
-    def test_race_condition_put(self):
-        # Setup
-        api = UserFridgeNotificationApi(db_client=MagicMock())
-        user_id = "user1"
-        fridge_id = "fridge1"
-        updated_at = "2025-10-28T12:00:00Z"
-        item = {
-            "userId": {"S": user_id},
-            "fridgeId": {"S": fridge_id},
-            "updatedAt": {"S": updated_at}
-        }
-        # Mock get_item to return the same updatedAt for both calls
-        api.db_client.get_item.return_value = {"Item": item}
+    def test_patch_update_conflict_returns_not_found(self):
+        """ConditionalCheckFailedException on update means item was deleted concurrently."""
+        self.mock_repository.get.return_value = self.item_dict
+        self.mock_repository.update.side_effect = ClientError(
+            error_response={"Error": {"Code": "ConditionalCheckFailedException"}},
+            operation_name="PutItem",
+        )
+        response = self.service.patch_user_fridge_notification(
+            self.user_id, self.fridge_id, {"email": {k: False for k in self.sms_prefs}}
+        )
+        self.assertEqual(response["statusCode"], 404)
+        body = json.loads(response["body"])
+        self.assertEqual(body["error"]["message"], "User Fridge Notification not found")
+        self.assertEqual(body["error"]["code"], "ITEM_NOT_FOUND")
 
-        # First put_item succeeds
-        api.db_client.put_item.return_value = {}
+    # --- DELETE ---
 
-        # Second put_item raises ConditionalCheckFailedException
-        def put_item_side_effect(*args, **kwargs):
-            if hasattr(put_item_side_effect, "called"):
-                raise ClientError(
-                    {"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem"
-                )
-            put_item_side_effect.called = True
-            return {}
-        api.db_client.put_item.side_effect = put_item_side_effect
+    def test_delete_user_fridge_notification_success(self):
+        self.mock_repository.delete.return_value = True
+        response = self.service.delete_user_fridge_notification(self.user_id, self.fridge_id)
+        self.assertEqual(response["statusCode"], 204)
 
-        # Prepare model
-        model = MagicMock()
-        model.userId = user_id
-        model.fridgeId = fridge_id
-        model.model_dump.return_value = {"userId": user_id, "fridgeId": fridge_id, "updatedAt": updated_at}
-
-        # First update should succeed
-        response1 = api.put_user_fridge_notification(model)
-        self.assertEqual(response1.status_code, 200)
-
-        # Second update should fail with conflict
-        response2 = api.put_user_fridge_notification(model)
-        self.assertEqual(response2.status_code, 409)
-        self.assertIn("Update conflict, please retry", response2.body["message"])
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_delete_user_fridge_notification_not_found(self):
+        self.mock_repository.delete.return_value = False
+        response = self.service.delete_user_fridge_notification(self.user_id, self.fridge_id)
+        self.assertEqual(response["statusCode"], 404)
+        body = json.loads(response["body"])
+        self.assertEqual(body["error"]["message"], "User Fridge Notification not found")
+        self.assertEqual(body["error"]["code"], "ITEM_NOT_FOUND")

@@ -2,7 +2,7 @@
 import json
 from enum import Enum, IntEnum
 from typing import Optional
-
+#TODO: consider publishing a package so that this is standard across services
 
 class HttpStatus(IntEnum):
     OK = 200

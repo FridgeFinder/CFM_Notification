@@ -73,10 +73,10 @@ Confirm that the following requests work for you
 1. `cd user-fridge-notification-service/`
 2. `sam build --use-container`
 3. `sam local invoke HelloWorldFunction --event events/event.json`
-    * response: ```{"statusCode": 200, "body": "{\"message\": \"hello world\"}"}```
+    * response: ```{"statusCode": 200, "body": "{\"message\": \"hello world - notification service\"}"}```
 4. `sam local start-api`
 5. `curl http://localhost:3000/hello`
-    * response: ```{"message": "hello world"}```
+    * response: ```{"message": "hello world - notification service"}```
 
 If it does yay, keep going 🤸‍♀️
 
@@ -137,29 +137,35 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Upgrade packaging tools and install the project in editable mode:
-
-```sh
-pip install -U pip setuptools wheel
-pip install -e .
-```
-
-3. Install test dependencies:
+2. Install test dependencies:
 
 ```sh
 pip install -r user-fridge-notification-service/tests/requirements.txt
 ```
 
-4. Run tests (unittest discovery):
+4. Run tests:
 
 ```sh
-python -m unittest discover -s user-fridge-notification-service/tests/unit -t .
+pytest user-fridge-notification-service/tests/unit
+```
+
+Or run with coverage:
+
+```sh
+pytest user-fridge-notification-service/tests/unit --cov=user-fridge-notification-service/functions --cov-report=term-missing
+```
+
+To generate an HTML coverage report:
+
+```sh
+pytest user-fridge-notification-service/tests/unit --cov=user-fridge-notification-service/functions --cov-report=html
+# Open htmlcov/index.html in your browser to view the report
 ```
 
 Or run a single test file:
 
 ```sh
-python -m unittest Notification.tests.unit.test_user_fridge_notifications_api
+pytest user-fridge-notification-service/tests/unit/test_user_fridge_notifications_api.py
 ```
 
 To deactivate the environment when done:
@@ -196,4 +202,26 @@ The following parameters are configured per environment:
 - `CFMHostedZoneId`: Route53 Hosted Zone ID for custom domain
 - `FirebaseProjectId`: Firebase Project ID for authentication
 
-See [FIREBASE_AUTH_SETUP.md](FIREBASE_AUTH_SETUP.md) for Firebase configuration details
+---
+## Linting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+
+Install it via the local requirements (from the project root with your virtual environment active):
+
+```sh
+pip install -r user-fridge-notification-service/local_requirements.txt
+```
+
+Run the linter:
+
+```sh
+# Check for lint errors
+ruff check user-fridge-notification-service/
+
+# Auto-fix lint errors where possible
+ruff check --fix user-fridge-notification-service/
+
+# Format code
+ruff format user-fridge-notification-service/
+```
