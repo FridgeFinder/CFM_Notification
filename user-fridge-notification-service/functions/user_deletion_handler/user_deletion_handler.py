@@ -4,22 +4,59 @@ Deletes all notification entries for a deleted user.
 """
 import os
 import logging
-import boto3
 from botocore.exceptions import ClientError
+
+from dynamodb_utils import get_ddb_connection
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def get_ddb_connection():
-    """Create a DynamoDB client; uses LocalStack when env is 'local'."""
-    env = os.environ.get('DEPLOYMENT_TARGET', 'aws')
-    if env == 'aws':
-        return boto3.client('dynamodb')
-    else:
-        return boto3.client('dynamodb', endpoint_url='http://localstack:4566/')
-
 dynamodb = get_ddb_connection()
 table_name = os.environ.get('TABLE_NAME')
+
+
+def query_notifications(user_id: str) -> list:
+    """
+    Query all notification records for a user.
+
+    Args:
+        user_id: The user ID
+
+    Returns:
+        List of DynamoDB items in wire format
+
+    Raises:
+        ClientError: If the DynamoDB query call fails
+    """
+    response = dynamodb.query(
+        TableName=table_name,
+        KeyConditionExpression='userId=:userId',
+        ExpressionAttributeValues={
+            ':userId': {'S': user_id}
+        }
+    )
+    return response.get('Items', [])
+
+
+def delete_notification(user_id: str, fridge_id: str) -> None:
+    """
+    Delete a single notification record for a user/fridge pair.
+
+    Args:
+        user_id: The user ID
+        fridge_id: The fridge ID
+
+    Raises:
+        ClientError: If the DynamoDB delete_item call fails
+    """
+    dynamodb.delete_item(
+        TableName=table_name,
+        Key={
+            'userId': {'S': user_id},
+            'fridgeId': {'S': fridge_id}
+        }
+    )
+
 
 def lambda_handler(event, context):
     """
@@ -49,28 +86,14 @@ def lambda_handler(event, context):
         })
         
         # Query all notifications for this user
-        response = dynamodb.query(
-            TableName=table_name,
-            KeyConditionExpression='userId=:userId',
-            ExpressionAttributeValues={
-                ':userId': {'S': user_id}
-            }
-        )
-        
-        items = response.get('Items', [])
+        items = query_notifications(user_id)
         deleted_count = 0
         failed_count = 0
         total_count = len(items)
         # Delete each notification
         for item in items:
             try:
-                dynamodb.delete_item(
-                    TableName=table_name,
-                    Key={
-                        'userId': {'S': item['userId']['S']},
-                        'fridgeId': {'S': item['fridgeId']['S']}
-                    }
-                )
+                delete_notification(item['userId']['S'], item['fridgeId']['S'])
                 deleted_count += 1
             except ClientError as e:
                 failed_count += 1
@@ -101,7 +124,7 @@ def lambda_handler(event, context):
             'failedCount': failed_count
         }
         
-    except KeyError as e:
+    except KeyError as e:# wont get here if configured correctly
         error_msg = f"Missing required field in event: {str(e)}"
         logger.error("Invalid event structure", extra={
             "error": error_msg,

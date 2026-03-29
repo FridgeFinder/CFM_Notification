@@ -25,7 +25,7 @@ def process_fridge_report(fridge_id: str, fridge_condition: str, food_level: int
     if not formated_fridge_condition or not formated_food_condition:
         # It's possible we add a new condition or food level in the Status Report service 
         # that the notification service does not yet support
-        logger.warning(f"Invalid condition or food level in record")
+        logger.warning("Invalid condition or food level in record")
         return
 
     for pref in notification_prefs:
@@ -96,7 +96,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             new_image = dynamodb_data.get('NewImage', {})
             
             if not new_image:
-                logger.warning(f"No new image found in record")
+                logger.warning("No new image found in record")
                 continue
             
             # Extract required fields using TypeDeserializer
@@ -106,7 +106,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             
             if not fridge_id or not condition or not food_level:
                 #Note: Should not get here, all of these fields are required to make a status report
-                logger.warning(f"Missing required fields in record")
+                logger.warning("Missing required fields in record")
                 continue
 
             # Process the fridge report

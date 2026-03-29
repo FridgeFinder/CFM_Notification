@@ -2,32 +2,17 @@ from pydantic import ValidationError
 import os
 import logging
 import json
-import requests
 
-try:
-    from user_fridge_notifications_model import UserFridgeNotificationModel
-    from user_fridge_notifications_service import UserFridgeNotificationService
-    from user_fridge_notifications_repository import UserFridgeNotificationRepository
-    from response_utils import error_response, ErrorCode
-except ModuleNotFoundError:
-    # Fallback: absolute imports (works when package is installed / running tests)
-    from Notification.dependencies.python.user_fridge_notifications_model import UserFridgeNotificationModel
-    from Notification.dependencies.python.user_fridge_notifications_service import UserFridgeNotificationService
-    from Notification.dependencies.python.user_fridge_notifications_repository import UserFridgeNotificationRepository
-    from Notification.dependencies.python.response_utils import error_response, ErrorCode
+from user_fridge_notifications_model import UserFridgeNotificationModel
+from user_fridge_notifications_service import UserFridgeNotificationService
+from user_fridge_notifications_repository import UserFridgeNotificationRepository
+from response_utils import error_response, ErrorCode, HttpStatus
+from dynamodb_utils import get_ddb_connection
+from auth_utils import get_authenticated_user_id, validate_user_authorization
 
 # Setup logger first
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-def get_ddb_connection() -> object:
-    """Create a DynamoDB client; uses LocalStack when env is 'local'."""
-    import boto3
-    env = os.environ["DEPLOYMENT_TARGET"]
-    if env == "aws":
-        return boto3.client("dynamodb")
-    else:
-        return boto3.client("dynamodb", endpoint_url="http://localstack:4566/")
 
 # Get Environment variables
 table_name = os.environ["TABLE_NAME"]
@@ -37,19 +22,6 @@ logger.info("TABLE_NAME=%s", table_name)
 db_client = get_ddb_connection()
 repository = UserFridgeNotificationRepository(db_client=db_client, table_name=table_name)
 service = UserFridgeNotificationService(repository=repository)
-
-def get_authenticated_user_id(event):
-    """
-    Extract userId (Firebase UUID) from JWT token claims
-    API Gateway v2 (HTTP API) provides JWT claims in requestContext.authorizer.jwt.claims
-    Args:
-        event: API Gateway HTTP API event
-    Returns:
-        User ID from JWT 'sub' claim
-    """
-    # For HTTP API with JWT authorizer, user ID is in the 'sub' claim
-    user_id = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {}).get('sub')
-    return user_id
 
 def validate_request_parameters(
     authenticated_user_id: str,
@@ -61,7 +33,7 @@ def validate_request_parameters(
 ) -> dict:
     """
     Validate required request parameters from API Gateway and enforce authorization.
-    
+
     Args:
         authenticated_user_id: User ID from JWT token
         user_id: User ID from path parameters
@@ -69,57 +41,30 @@ def validate_request_parameters(
         request_id: Request ID for tracing
         path: Request path for logging
         http_method: HTTP method for logging
-        
+
     Returns:
         Error response dict if validation fails, None if all validations pass
     """
-    # Should never get here if API Gateway JWT authorizer is configured correctly
-    if not authenticated_user_id or not authenticated_user_id.strip():
-        return error_response(
-            500, "Authentication failed: No sub found in JWT", 
-            ErrorCode.INTERNAL_SERVER_ERROR,
-            request_id=request_id,
-            log_level="error",
-            extra={'path': path}
-        )
-    
     # Validate required path parameters
     if not fridge_id or not fridge_id.strip():
+        logger.error("Missing required path parameter: fridge_id", extra={"request_id": request_id, "user_id": user_id, "path": path})
         return error_response(
-            400, "Missing required path parameter: fridge_id", 
+            HttpStatus.BAD_REQUEST, "Missing required path parameter: fridge_id",
             ErrorCode.MISSING_REQUIRED_FIELD,
-            request_id=request_id,
-            log_level="error",
-            extra={"user_id": user_id, "path": path}
+            request_id=request_id
         )
-    
+
     if not user_id or not user_id.strip():
+        logger.error("Missing required path parameter: user_id", extra={"request_id": request_id, "fridge_id": fridge_id, "path": path})
         return error_response(
-            400, "Missing required path parameter: user_id", 
+            HttpStatus.BAD_REQUEST, "Missing required path parameter: user_id",
             ErrorCode.MISSING_REQUIRED_FIELD,
-            request_id=request_id,
-            log_level="error",
-            extra={"fridge_id": fridge_id, "path": path}
+            request_id=request_id
         )
-    
-    # NOTE: don't need user_id in pathParameters but if we ever want to allow for ADMIN users to 
+
+    # NOTE: don't need user_id in pathParameters but if we ever want to allow for ADMIN users to
     # access other users' notifications we can keep it
-    # Enforce that the authenticated user can only access their own notifications
-    if user_id != authenticated_user_id:
-        return error_response(
-            403, "Unauthorized: User can only access their own data", 
-            ErrorCode.FORBIDDEN,
-            request_id=request_id,
-            log_level="warning",
-            extra={
-                "path_user_id": user_id,
-                "authenticated_user_id": authenticated_user_id,
-                "http_method": http_method,
-                "path": path
-            }
-        )
-    
-    return None  # All validations passed
+    return validate_user_authorization(authenticated_user_id, user_id, request_id, path, http_method)
 
 
 def handle_get_request(userId: str, fridgeId: str, request_id: str) -> dict:
@@ -152,7 +97,7 @@ def handle_post_request(event: dict, userId: str, fridgeId: str, request_id: str
     """
     body = event.get("body")
     if not body:
-        return error_response(400, "Missing request body", ErrorCode.MISSING_BODY) 
+        return error_response(HttpStatus.BAD_REQUEST, "Missing request body", ErrorCode.MISSING_BODY) 
     try:
         body_dict = json.loads(body)
         body_dict["userId"] = userId
@@ -160,9 +105,9 @@ def handle_post_request(event: dict, userId: str, fridgeId: str, request_id: str
         model = UserFridgeNotificationModel(**body_dict)
         return service.post_user_fridge_notification(user_notification_model=model, request_id=request_id)
     except json.JSONDecodeError:
-        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
+        return error_response(HttpStatus.BAD_REQUEST, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
     except ValidationError as ve:
-        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
+        return error_response(HttpStatus.BAD_REQUEST, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
 
 
 def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: str) -> dict:
@@ -181,14 +126,14 @@ def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: st
     """
     body = event.get("body")
     if not body:
-        return error_response(400, "Missing request body", ErrorCode.MISSING_BODY, request_id=request_id)
+        return error_response(HttpStatus.BAD_REQUEST, "Missing request body", ErrorCode.MISSING_BODY, request_id=request_id)
     
     try:
         body_dict = json.loads(body)
         # Only contactTypePreferences can be updated
         contactTypePreferences = body_dict.get("contactTypePreferences")
         if not contactTypePreferences:
-            return error_response(400, "contactTypePreferences is required", ErrorCode.MISSING_REQUIRED_FIELD, request_id=request_id)
+            return error_response(HttpStatus.BAD_REQUEST, "contactTypePreferences is required", ErrorCode.MISSING_REQUIRED_FIELD, request_id=request_id)
         
         return service.patch_user_fridge_notification(
             userId=userId,
@@ -197,9 +142,9 @@ def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: st
             request_id=request_id
         )
     except json.JSONDecodeError:
-        return error_response(400, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
+        return error_response(HttpStatus.BAD_REQUEST, "Invalid JSON in request body", ErrorCode.INVALID_JSON, request_id=request_id)
     except ValidationError as ve:
-        return error_response(400, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
+        return error_response(HttpStatus.BAD_REQUEST, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
 
 
 def handle_delete_request(userId: str, fridgeId: str, request_id: str) -> dict:
@@ -264,16 +209,12 @@ def lambda_handler(event, context):
             response = handle_delete_request(userId=user_id, fridgeId=fridge_id, request_id=request_id)
         else:
             # Should never get here - indicates a configuration error
+            logger.error("Invalid HTTP method", extra={"request_id": request_id, "http_method": http_method, "path": path})
             return error_response(
-                status_code=500, 
-                message="Invalid HTTP method", 
+                status_code=HttpStatus.INTERNAL_SERVER_ERROR,
+                message="Invalid HTTP method",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
-                request_id=request_id,
-                log_level="error",
-                extra={
-                    "http_method": http_method,
-                    "path": path
-                }
+                request_id=request_id
             )
         
         # Log successful response
@@ -301,4 +242,4 @@ def lambda_handler(event, context):
                 "error_type": type(e).__name__
             }
         )
-        return error_response(500, "Internal server error", ErrorCode.INTERNAL_SERVER_ERROR, request_id=request_id)
+        return error_response(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", ErrorCode.INTERNAL_SERVER_ERROR, request_id=request_id)

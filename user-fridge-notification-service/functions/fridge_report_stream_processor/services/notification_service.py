@@ -107,8 +107,23 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
                                 <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
                                     <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px;">
                                         Stay connected with your community fridges 🍏
-                                    </p>
-                                    <p style="margin: 0 0 15px 0; color: #999999; font-size: 11px; line-height: 1.4;">
+                                    </p>                                    
+                                    <!-- App Store Buttons -->
+                                    <table role="presentation" style="margin: 0 auto 12px auto;">
+                                        <tr>
+                                            <td style="padding: 0 5px;">
+                                                <a href="https://apps.apple.com/app/YOUR_APP_ID" style="display: inline-block;">
+                                                    <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" style="height: 45px; width: auto;" />
+                                                </a>
+                                            </td>
+                                            <td style="padding: 0 5px;">
+                                                <a href="https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME" style="display: inline-block;">
+                                                    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" style="height: 63px; width: auto;" />
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                                                        <p style="margin: 0 0 15px 0; color: #999999; font-size: 11px; line-height: 1.4;">
                                         This is an automated notification. Please do not reply to this email.
                                     </p>
                                     <p style="margin: 0 0 15px 0; color: #999999; font-size: 11px; line-height: 1.4;">
@@ -178,7 +193,7 @@ def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_
     try:
         message = get_notification_message(pref, formated_fridge_condition, formated_food_condition, food_level)
         if not message:
-            logger.info(f'User does not want push notifications for this condition/food level')
+            logger.info('User does not want push notifications for this condition/food level')
             return
         
         message = messaging.Message(
@@ -196,7 +211,7 @@ def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_
         logger.warning(f'FCM token is invalid or unregistered: {fcm_token[:20]}...')
         # TODO: Mark token as invalid in user table
     except messaging.SenderIdMismatchError:
-        logger.error(f'FCM token belongs to different Firebase project')
+        logger.error('FCM token belongs to different Firebase project')
     except Exception as e:
         logger.error(f'Failed to send push notification: {e}', exc_info=True)
 

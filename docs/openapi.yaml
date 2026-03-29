@@ -76,7 +76,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
+                  notifications:
                     type: array
                     items:
                       $ref: '#/components/schemas/UserFridgeNotification'
@@ -433,6 +433,7 @@ components:
       required:
         - good
         - noFood
+        - hasFood
       description: |
         Notification preferences for different fridge states and food levels.
         
@@ -502,8 +503,8 @@ components:
                 - VALIDATION_ERROR
                 - IMMUTABLE_FIELD
                 - MISSING_REQUIRED_FIELD
-                - NOT_FOUND
-                - ALREADY_EXISTS
+                - ITEM_NOT_FOUND
+                - ITEM_ALREADY_EXISTS
                 - INTERNAL_SERVER_ERROR
                 - DATABASE_ERROR
                 - INVALID_HTTP_METHOD
@@ -581,7 +582,7 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              code: "NOT_FOUND"
+              code: "ITEM_NOT_FOUND"
               message: "User Fridge Notification preference not found"
 
     Conflict:
@@ -595,7 +596,7 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              code: "ALREADY_EXISTS"
+              code: "ITEM_ALREADY_EXISTS"
               message: "Notification preference already exists for this user and fridge"
 
     InternalServerError:

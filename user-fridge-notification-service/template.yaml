@@ -119,7 +119,7 @@ Resources:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: functions/hello_world/
-      Handler: app.lambda_handler
+      Handler: hello_world_handler.lambda_handler
       Runtime: python3.13
       Architectures:
         - x86_64
@@ -138,7 +138,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/fridge_notifications/user
-      Handler: app.lambda_handler
+      Handler: user_fridge_notifications_handler.lambda_handler
       Runtime: python3.13
       FunctionName: !Sub UserFridgeNotificationsFunction${Environment}
       Layers:
@@ -192,7 +192,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/fridge_notifications/getAllUserNotifications
-      Handler: app.lambda_handler
+      Handler: get_all_user_notifications_handler.lambda_handler
       Runtime: python3.13
       FunctionName: !Sub GetAllUserFridgeNotificationsFunction${Environment}
       Layers:
@@ -208,9 +208,8 @@ Resources:
             Resource: arn:aws:logs:*:*:*
           - Effect: Allow
             Action:
-            - dynamodb:Scan
             - dynamodb:Query
-            Resource: 
+            Resource:
               - !GetAtt UserFridgeNotificationsTable.Arn
               - !Sub "${UserFridgeNotificationsTable.Arn}/index/*"
       Events:
@@ -226,7 +225,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/fridge_report_stream_processor
-      Handler: app.lambda_handler
+      Handler: fridge_report_stream_processor_handler.lambda_handler
       Runtime: python3.13
       FunctionName: !Sub FridgeReportStreamProcessorFunction${Environment}
       ReservedConcurrentExecutions: 5
@@ -284,9 +283,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/user_deletion_handler
-      Handler: app.lambda_handler
+      Handler: user_deletion_handler.lambda_handler
       Runtime: python3.13
       FunctionName: !Sub UserDeletionHandlerFunction${Environment}
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -368,7 +369,7 @@ Resources:
         Properties:
             LayerName: !Sub FridgeNotificationsLayer${Environment}
             Description: Dependencies for FridgeFinder Fridge Notifications service
-            ContentUri: dependencies/
+            ContentUri: layers/
             CompatibleRuntimes:
               - python3.13
             RetentionPolicy: Delete
