@@ -59,16 +59,19 @@ class UserFridgeNotificationRepository:
             ConditionExpression="attribute_not_exists(userId) AND attribute_not_exists(fridgeId)"
         )
 
-    def update(self, ufn_model: UserFridgeNotificationModel) -> None:
+    def patch(self, ufn_model: UserFridgeNotificationModel, original_updated_at: str) -> None:
         """
-        Update an existing user fridge notification.
+        Conditionally update an existing user fridge notification using optimistic locking.
+        The write is rejected if updatedAt no longer matches, meaning the item was either
+        deleted or modified concurrently since it was last read.
 
         Args:
             ufn_model: The UserFridgeNotificationModel with updated values
+            original_updated_at: The updatedAt value read before applying changes
 
         Raises:
             ClientError: If DynamoDB operation fails
-                - ConditionalCheckFailedException if item doesn't exist
+                - ConditionalCheckFailedException if item was deleted or concurrently modified
                 - Other ClientErrors for DynamoDB failures
         """
         dict_format = ufn_model.model_dump(mode="json")
@@ -76,7 +79,8 @@ class UserFridgeNotificationRepository:
         self.db_client.put_item(
             TableName=self.table_name,
             Item=serialized_data,
-            ConditionExpression="attribute_exists(userId) AND attribute_exists(fridgeId)"
+            ConditionExpression="updatedAt = :prev",
+            ExpressionAttributeValues={":prev": {"S": original_updated_at}}
         )
 
     def delete(self, user_id: str, fridge_id: str) -> bool:

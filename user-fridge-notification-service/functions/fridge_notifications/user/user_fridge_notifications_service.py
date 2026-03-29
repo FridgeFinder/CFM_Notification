@@ -68,19 +68,20 @@ class UserFridgeNotificationService:
                 )
             
             # Convert to model to leverage validation and helper, update preferences
+            original_updated_at = ufn_dict["updatedAt"]
             ufn_model = UserFridgeNotificationModel(**ufn_dict)
             ufn_model.patch_preferences(contactTypePreferences)
             
-            # Save updated model
-            self.repository.update(ufn_model)
+            # Save updated model, guarded by optimistic lock on updatedAt
+            self.repository.patch(ufn_model, original_updated_at)
             return http_response(HttpStatus.OK, ufn_model.model_dump(mode="json"), request_id=request_id)
         except ValidationError as ve:
             # Pydantic validation error when validating contactTypePreferences
             return error_response(HttpStatus.BAD_REQUEST, str(ve), ErrorCode.VALIDATION_ERROR, request_id=request_id)
         except ClientError as e:
             if e.response['Error'].get('Code') == "ConditionalCheckFailedException":
-                # Super Duper Unlikely: Item was deleted between get and update
-                return error_response(HttpStatus.NOT_FOUND, "User Fridge Notification not found", ErrorCode.ITEM_NOT_FOUND, request_id=request_id)
+                # Item was deleted or concurrently modified between read and write
+                return error_response(HttpStatus.CONFLICT, "Item was concurrently modified", ErrorCode.CONCURRENT_MODIFICATION, request_id=request_id)
             raise
 
     def delete_user_fridge_notification(self, userId: str, fridgeId: str, request_id: str = None) -> dict:

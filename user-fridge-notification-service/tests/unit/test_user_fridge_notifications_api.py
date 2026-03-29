@@ -26,6 +26,8 @@ class TestUserFridgeNotificationService(unittest.TestCase):
             "userId": self.user_id,
             "fridgeId": self.fridge_id,
             "contactTypePreferences": {"email": self.sms_prefs},
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": "2026-01-01T00:00:00.000Z",
         }
         self.model = UserFridgeNotificationModel(
             userId=self.user_id,
@@ -84,7 +86,7 @@ class TestUserFridgeNotificationService(unittest.TestCase):
 
     def test_patch_user_fridge_notification_success(self):
         self.mock_repository.get.return_value = self.item_dict
-        self.mock_repository.update.return_value = None
+        self.mock_repository.patch.return_value = None
         new_prefs = {"email": {k: False for k in self.sms_prefs}}
         response = self.service.patch_user_fridge_notification(
             self.user_id, self.fridge_id, new_prefs
@@ -105,7 +107,7 @@ class TestUserFridgeNotificationService(unittest.TestCase):
 
     def test_patch_user_fridge_notification_db_error(self):
         self.mock_repository.get.return_value = self.item_dict
-        self.mock_repository.update.side_effect = ClientError(
+        self.mock_repository.patch.side_effect = ClientError(
             error_response={"Error": {"Code": "InternalServerError", "Message": "Database Error"}},
             operation_name="PutItem",
         )
@@ -114,20 +116,20 @@ class TestUserFridgeNotificationService(unittest.TestCase):
                 self.user_id, self.fridge_id, {"email": {k: False for k in self.sms_prefs}}
             )
 
-    def test_patch_update_conflict_returns_not_found(self):
-        """ConditionalCheckFailedException on update means item was deleted concurrently."""
+    def test_patch_update_conflict_returns_conflict(self):
+        """ConditionalCheckFailedException on patch means item was deleted or concurrently modified."""
         self.mock_repository.get.return_value = self.item_dict
-        self.mock_repository.update.side_effect = ClientError(
+        self.mock_repository.patch.side_effect = ClientError(
             error_response={"Error": {"Code": "ConditionalCheckFailedException"}},
             operation_name="PutItem",
         )
         response = self.service.patch_user_fridge_notification(
             self.user_id, self.fridge_id, {"email": {k: False for k in self.sms_prefs}}
         )
-        self.assertEqual(response["statusCode"], 404)
+        self.assertEqual(response["statusCode"], 409)
         body = json.loads(response["body"])
-        self.assertEqual(body["error"]["message"], "User Fridge Notification not found")
-        self.assertEqual(body["error"]["code"], "ITEM_NOT_FOUND")
+        self.assertEqual(body["error"]["message"], "Item was concurrently modified")
+        self.assertEqual(body["error"]["code"], "CONCURRENT_MODIFICATION")
 
     # --- DELETE ---
 
