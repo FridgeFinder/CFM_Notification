@@ -43,7 +43,7 @@ class ErrorCode(str, Enum):
     INVALID_HTTP_METHOD = "INVALID_HTTP_METHOD"
 
 
-def http_response(status_code: int, data: dict, request_id: Optional[str] = None) -> dict:
+def http_response(status_code: int, data: Optional[dict], request_id: Optional[str] = None) -> dict:
     """
     Create a standardized API response.
 
