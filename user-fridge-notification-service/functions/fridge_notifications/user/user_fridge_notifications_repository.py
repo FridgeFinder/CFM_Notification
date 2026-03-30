@@ -110,6 +110,7 @@ class UserFridgeNotificationRepository:
         """
         Get all users subscribed to notifications for a specific fridge.
         Uses the FridgeIndex GSI.
+        TODO: implement pagination if needed when number of subscribers grows 
 
         Args:
             fridge_id: The fridge ID
