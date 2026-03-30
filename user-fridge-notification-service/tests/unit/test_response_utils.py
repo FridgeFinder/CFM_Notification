@@ -57,10 +57,10 @@ class TestHttpResponse(unittest.TestCase):
         response = http_response(200, {})
         self.assertNotIn("X-Request-ID", response["headers"])
 
-    def test_none_data_serialized_as_null(self):
+    def test_none_data_returns_empty_body(self):
         response = http_response(204, None)
         self.assertEqual(response["statusCode"], 204)
-        self.assertIsNone(json.loads(response["body"]))
+        self.assertEqual(response["body"], "")
 
     def test_created_status(self):
         response = http_response(HttpStatus.CREATED, {"id": "123"})

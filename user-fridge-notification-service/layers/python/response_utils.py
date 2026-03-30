@@ -64,7 +64,7 @@ def http_response(status_code: int, data: dict, request_id: Optional[str] = None
     return {
         "statusCode": status_code,
         "headers": headers,
-        "body": json.dumps(data)
+        "body": "" if data is None else json.dumps(data)
     }
 
 

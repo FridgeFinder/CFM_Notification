@@ -173,7 +173,7 @@ class TestHandlePatchRequest(unittest.TestCase):
 class TestHandleDeleteRequest(unittest.TestCase):
     def test_delegates_to_service(self):
         with patch.object(handler, "service") as mock_svc:
-            mock_svc.delete_user_fridge_notification.return_value = {"statusCode": 204, "body": "null"}
+            mock_svc.delete_user_fridge_notification.return_value = {"statusCode": 204, "body": ""}
             handler.handle_delete_request("user_1", "fridge_1", "req-1")
         mock_svc.delete_user_fridge_notification.assert_called_once_with(
             userId="user_1", fridgeId="fridge_1", request_id="req-1"
@@ -206,7 +206,7 @@ class TestLambdaHandlerRouting(unittest.TestCase):
 
     def test_routes_delete_to_delete_handler(self):
         with patch.object(handler, "service") as mock_svc:
-            mock_svc.delete_user_fridge_notification.return_value = {"statusCode": 204, "body": "null"}
+            mock_svc.delete_user_fridge_notification.return_value = {"statusCode": 204, "body": ""}
             response = handler.lambda_handler(_make_event("DELETE"), _FakeContext())
         self.assertEqual(response["statusCode"], 204)
         mock_svc.delete_user_fridge_notification.assert_called_once()
