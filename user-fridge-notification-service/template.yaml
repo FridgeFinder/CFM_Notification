@@ -1,0 +1,402 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Notifications
+
+  Sample SAM Template for FridgeFinder Notifications Service
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Sub user_fridge_notifications_${Environment}
+        DEPLOYMENT_TARGET: !Ref DeploymentTarget
+        ENVIRONMENT: !Ref Environment
+        FIREBASE_PROJECT_ID: !Ref FirebaseProjectId
+
+Parameters:
+  DeploymentTarget:
+    Type: String
+    Description: Choose between local or AWS
+    AllowedValues:
+      - local
+      - aws
+  Environment:
+    Type: String
+    Description: Choose between dev, staging, prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+  CFMHostedZoneId:
+    Type: String
+    Description: Grab the HostedZoneId from Route53 console
+  FirebaseProjectId:
+    Type: String
+    Description: Firebase Project ID for authentication
+  FirebaseSecretName:
+    Type: String
+    Description: Name of the secret in AWS Secrets Manager containing Firebase credentials
+    Default: firebase-service-account-dev
+
+
+Resources:
+  # SSL Certificate for custom domain
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub notifications-api-${Environment}.communityfridgefinder.com
+      DomainValidationOptions:
+       - DomainName: !Sub notifications-api-${Environment}.communityfridgefinder.com
+         HostedZoneId: !Sub ${CFMHostedZoneId}
+      ValidationMethod: DNS
+  # HTTP API
+  ApiGatewayApi:
+      Type: AWS::Serverless::HttpApi
+      Properties:
+        Description: "FridgeFinder Notifications API with Firebase Authentication"
+        StageName: !Ref Environment
+        Auth:
+          Authorizers:
+            FirebaseAuthorizer:
+              JwtConfiguration:
+                issuer: !Sub "https://securetoken.google.com/${FirebaseProjectId}"
+                audience:
+                  - !Ref FirebaseProjectId
+              IdentitySource: $request.header.Authorization
+          DefaultAuthorizer: FirebaseAuthorizer
+        CorsConfiguration:
+          AllowMethods:
+            - GET
+            - POST
+            - PATCH
+            - DELETE
+            - OPTIONS
+          AllowHeaders:
+            - Content-Type
+            - Authorization
+            - X-Amz-Date
+            - X-Api-Key
+            - X-Amz-Security-Token
+          AllowOrigins:
+            - '*'
+
+  # Custom Domain Name
+  ApiDomainName:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Sub notifications-api-${Environment}.communityfridgefinder.com
+      DomainNameConfigurations:
+        - CertificateArn: !Ref ApiCertificate
+          EndpointType: REGIONAL
+
+  # API Mapping
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Ref ApiDomainName
+      ApiId: !Ref ApiGatewayApi
+      Stage: !Ref ApiGatewayApi.Stage
+
+  # Route53 DNS Record
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref CFMHostedZoneId
+      Name: !Sub notifications-api-${Environment}.communityfridgefinder.com
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiDomainName.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomainName.RegionalHostedZoneId
+  
+  ##########################
+  ##   Lambda Functions   ##
+  ##########################
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: functions/hello_world/
+      Handler: hello_world_handler.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Events:
+        HelloWorld:
+          Type: HttpApi
+          Properties:
+            Path: /hello
+            Method: get
+            ApiId:
+              Ref: ApiGatewayApi
+            Auth:
+              Authorizer: NONE
+  
+  UserFridgeNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/fridge_notifications/user
+      Handler: user_fridge_notifications_handler.lambda_handler
+      Runtime: python3.13
+      FunctionName: !Sub UserFridgeNotificationsFunction${Environment}
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            Resource: !GetAtt UserFridgeNotificationsTable.Arn
+      Events:
+        PostUserFridgeNotification:
+          Type: HttpApi
+          Properties:
+            Path: /v1/users/{user_id}/fridge-notifications/{fridge_id}
+            Method: post
+            ApiId:
+              Ref: ApiGatewayApi
+        PatchUserFridgeNotification:
+          Type: HttpApi
+          Properties:
+            Path: /v1/users/{user_id}/fridge-notifications/{fridge_id}
+            Method: patch
+            ApiId:
+              Ref: ApiGatewayApi
+        GetUserFridgeNotification:
+          Type: HttpApi
+          Properties:
+            Path: /v1/users/{user_id}/fridge-notifications/{fridge_id}
+            Method: get
+            ApiId:
+              Ref: ApiGatewayApi
+        DeleteUserFridgeNotification:
+          Type: HttpApi
+          Properties:
+            Path: /v1/users/{user_id}/fridge-notifications/{fridge_id}
+            Method: delete
+            ApiId:
+              Ref: ApiGatewayApi
+  
+  GetAllUserFridgeNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/fridge_notifications/getAllUserNotifications
+      Handler: get_all_user_notifications_handler.lambda_handler
+      Runtime: python3.13
+      FunctionName: !Sub GetAllUserFridgeNotificationsFunction${Environment}
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            Resource:
+              - !GetAtt UserFridgeNotificationsTable.Arn
+              - !Sub "${UserFridgeNotificationsTable.Arn}/index/*"
+      Events:
+        GetAllUserFridgeNotifications:
+          Type: HttpApi
+          Properties:
+            Path: /v1/users/{user_id}/fridge-notifications
+            Method: get
+            ApiId:
+              Ref: ApiGatewayApi      
+
+  FridgeReportStreamProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/fridge_report_stream_processor
+      Handler: fridge_report_stream_processor_handler.lambda_handler
+      Runtime: python3.13
+      FunctionName: !Sub FridgeReportStreamProcessorFunction${Environment}
+      ReservedConcurrentExecutions: 5
+      Environment:
+        Variables:
+          USERS_TABLE_NAME: !Sub users_${Environment}
+          FIREBASE_SECRET_NAME: !Ref FirebaseSecretName
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:DescribeStream
+            - dynamodb:GetRecords
+            - dynamodb:GetShardIterator
+            - dynamodb:ListStreams
+            Resource:
+              Fn::ImportValue: !Sub "FridgeReportStreamArn-${Environment}"
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            Resource:
+              - !GetAtt UserFridgeNotificationsTable.Arn
+              - !Sub "${UserFridgeNotificationsTable.Arn}/index/*"
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users_${Environment}"
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:firebase-service-account-*'
+      Events:
+        FridgeReportStream:
+          Type: DynamoDB
+          Properties:
+            Stream:
+              Fn::ImportValue: !Sub "FridgeReportStreamArn-${Environment}"
+            StartingPosition: LATEST
+            BatchSize: 1
+            Enabled: true
+
+  UserDeletionHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/user_deletion_handler
+      Handler: user_deletion_handler.lambda_handler
+      Runtime: python3.13
+      FunctionName: !Sub UserDeletionHandlerFunction${Environment}
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            - dynamodb:DeleteItem
+            Resource: !GetAtt UserFridgeNotificationsTable.Arn
+
+  ##########################
+  ##   EventBridge Rule   ##
+  ##########################
+
+  UserDeletionEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub user-deletion-notification-cleanup-${Environment}
+      Description: Triggers notification cleanup when a user is deleted
+      EventBusName:
+        Fn::ImportValue: !Sub user-service-${Environment}-EventBusName
+      EventPattern:
+        source:
+          - user-service
+        detail-type:
+          - User Deleted
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt UserDeletionHandlerFunction.Arn
+          Id: UserDeletionHandlerTarget
+
+  UserDeletionEventRulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UserDeletionHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UserDeletionEventRule.Arn
+
+  ##########################
+  ##    DynamoDB Tables    ##
+  ##########################
+
+  UserFridgeNotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub user_fridge_notifications_${Environment}
+      BillingMode: "PAY_PER_REQUEST"
+      AttributeDefinitions:
+        - AttributeName: "userId"
+          AttributeType: "S"
+        - AttributeName: "fridgeId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "userId"
+          KeyType: "HASH"
+        - AttributeName: "fridgeId"
+          KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: FridgeIndex
+          KeySchema:
+            - AttributeName: fridgeId
+              KeyType: HASH
+            - AttributeName: userId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  ##########################
+  ##    CommonLayer    ##
+  ##########################
+  CommonLayer:
+        Type: AWS::Serverless::LayerVersion
+        Properties:
+            LayerName: !Sub FridgeNotificationsLayer${Environment}
+            Description: Dependencies for FridgeFinder Fridge Notifications service
+            ContentUri: layers/
+            CompatibleRuntimes:
+              - python3.13
+            RetentionPolicy: Delete
+
+Outputs:
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  NotificationsApiBaseUrl:
+    Description: "Base URL for Notifications API (custom domain)"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/"
+
+  NotificationsApiHelloWorld:
+    Description: "Hello World endpoint URL"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/hello"
+
+  NotificationsApiGetUserFridgeNotification:
+    Description: "GET user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/v1/users/{user_id}/fridge-notifications/{fridge_id}"
+
+  NotificationsApiPostUserFridgeNotification:
+    Description: "POST user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/v1/users/{user_id}/fridge-notifications/{fridge_id}"
+
+  NotificationsApiPatchUserFridgeNotification:
+    Description: "PATCH user fridge notification endpoint URL"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/v1/users/{user_id}/fridge-notifications/{fridge_id}"
+
+  NotificationsApiGetAllUserFridgeNotifications:
+    Description: "GET all user fridge notifications endpoint URL"
+    Value: !Sub "https://notifications-api-${Environment}.communityfridgefinder.com/v1/users/{user_id}/fridge-notifications"

@@ -1,7 +1,0 @@
-pytest
-boto3
-requests
-pydantic
-botocore
-email-validator
-phonenumbers
