@@ -13,7 +13,7 @@ def get_utc_timestamp() -> str:
 
 class FridgePreferencesModel(BaseModel):
     model_config = ConfigDict(extra="forbid") # Forbid extra fields
-    good: bool
+    good: bool = False
     dirty: bool = True
     outOfOrder: bool = True
     notAtLocation: bool = True
