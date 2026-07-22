@@ -13,6 +13,7 @@ logger = logging.getLogger()
 dynamodb = get_ddb_connection()
 notifications_table = os.environ.get('TABLE_NAME')
 users_table = os.environ.get('USERS_TABLE_NAME')
+user_devices_table = os.environ.get('USER_DEVICES_TABLE_NAME')
 
 
 def query_notifications_by_fridge(fridge_id: str) -> List[Dict]:
@@ -35,7 +36,7 @@ def query_notifications_by_fridge(fridge_id: str) -> List[Dict]:
 
 
 def get_user_details(user_id: str) -> Optional[Dict]:
-    """Fetch user email, fcmToken, and settings from user table."""
+    """Fetch user email and settings from the user table."""
     #NOTE: Might want to make this an API in the User Service instead of direct DB access
     logger.info(f"Fetching user details for userId: {user_id}")
     
@@ -43,7 +44,7 @@ def get_user_details(user_id: str) -> Optional[Dict]:
         response = dynamodb.get_item(
             TableName=users_table,
             Key={'userId': {'S': user_id}},
-            ProjectionExpression='email, fcmToken, settings'
+            ProjectionExpression='email, settings'
         )
         
         if 'Item' not in response:
@@ -58,3 +59,29 @@ def get_user_details(user_id: str) -> Optional[Dict]:
         #For Notifications partial success is better than no success. So just log and skip
         logger.error(f"Error fetching user {user_id}: {e}")
         return None
+
+
+def get_user_device_tokens(user_id: str) -> List[str]:
+    """Fetch active push notification tokens for a user from the user devices table."""
+    logger.info(f"Fetching user devices for userId: {user_id}")
+
+    try:
+        response = dynamodb.query(
+            TableName=user_devices_table,
+            KeyConditionExpression='userId = :userId',
+            FilterExpression='notificationsEnabled = :enabled AND attribute_not_exists(invalidAt)',
+            ExpressionAttributeValues={
+                ':userId': {'S': user_id},
+                ':enabled': {'BOOL': True},
+            },
+            ProjectionExpression='token'
+        )
+
+        items = [dynamodb_to_dict(item) for item in response.get('Items', [])]
+        tokens = [item['token'] for item in items if item.get('token')]
+        logger.info(f"Found {len(tokens)} active device tokens for user {user_id}")
+        return tokens
+    except Exception as e:
+        #For Notifications partial success is better than no success. So just log and skip
+        logger.error(f"Error fetching devices for user {user_id}: {e}")
+        return []

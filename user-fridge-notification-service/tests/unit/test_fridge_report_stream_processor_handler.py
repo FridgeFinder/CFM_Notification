@@ -147,8 +147,6 @@ class TestProcessFridgeReport(unittest.TestCase):
         }}
         if email:
             u["email"] = "user@example.com"
-        if push:
-            u["fcmToken"] = "fcm_token_abc"
         return u
 
     def test_sends_email_notification_when_email_enabled(self):
@@ -161,9 +159,19 @@ class TestProcessFridgeReport(unittest.TestCase):
     def test_sends_push_notification_when_push_enabled(self):
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
              patch.object(handler, "get_user_details", return_value=self._user(push=True)), \
+             patch.object(handler, "get_user_device_tokens", return_value=["fcm_token_abc"]), \
              patch.object(handler, "send_push_notification") as mock_push:
             handler.process_fridge_report("fridge_1", "good", 1)
         mock_push.assert_called_once()
+
+    def test_sends_push_notification_for_each_device_token(self):
+        with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
+             patch.object(handler, "get_user_details", return_value=self._user(push=True)), \
+             patch.object(handler, "get_user_device_tokens", return_value=["token_1", "token_2"]), \
+             patch.object(handler, "send_push_notification") as mock_push:
+            handler.process_fridge_report("fridge_1", "good", 1)
+
+        self.assertEqual(mock_push.call_count, 2)
 
     def test_skips_notification_when_user_details_not_found(self):
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_email()]), \
@@ -182,9 +190,9 @@ class TestProcessFridgeReport(unittest.TestCase):
 
     def test_no_push_sent_when_no_fcm_token(self):
         user = {"settings": {"emailNotificationEnabled": False, "pushNotificationEnabled": True}}
-        # fcmToken absent
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
              patch.object(handler, "get_user_details", return_value=user), \
+             patch.object(handler, "get_user_device_tokens", return_value=[]), \
              patch.object(handler, "send_push_notification") as mock_push:
             handler.process_fridge_report("fridge_1", "good", 1)
         mock_push.assert_not_called()

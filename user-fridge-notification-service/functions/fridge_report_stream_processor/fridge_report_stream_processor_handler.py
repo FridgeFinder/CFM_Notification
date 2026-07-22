@@ -4,7 +4,7 @@ from typing import Dict, Any
 # Local imports
 from constants import CONDITION_MAP, FOOD_LEVEL_NOTIFICATION_MAP
 from utils.firebase_client import initialize_firebase
-from repositories.notification_repository import query_notifications_by_fridge, get_user_details
+from repositories.notification_repository import query_notifications_by_fridge, get_user_details, get_user_device_tokens
 from services.notification_service import send_email_notification, send_push_notification
 
 # Set up logging
@@ -56,15 +56,16 @@ def process_fridge_report(fridge_id: str, fridge_condition: str, food_level: int
         
         # Check and send push notification
         if push_enabled:
-            fcm_token = user.get('fcmToken')
-            if fcm_token:
+            fcm_tokens = get_user_device_tokens(user_id)
+            if fcm_tokens:
                 device_prefs = (pref.get('contactTypePreferences') or {}).get('device')
                 if device_prefs:
-                    send_push_notification(device_prefs, fcm_token, fridge_id, formated_fridge_condition, formated_food_condition, food_level)
+                    for fcm_token in fcm_tokens:
+                        send_push_notification(device_prefs, fcm_token, fridge_id, formated_fridge_condition, formated_food_condition, food_level)
                 else:
                     logger.info(f"User {user_id} has no device notification preferences configured")
             else:
-                logger.info(f"User {user_id} has push notifications enabled but no FCM token found")
+                logger.info(f"User {user_id} has push notifications enabled but no registered device tokens found")
         else:
             logger.info(f"User {user_id} has push notifications disabled")
 

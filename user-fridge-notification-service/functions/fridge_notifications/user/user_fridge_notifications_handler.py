@@ -1,9 +1,7 @@
-from pydantic import ValidationError
 import os
 import logging
 import json
 
-from user_fridge_notifications_model import UserFridgeNotificationModel
 from user_fridge_notifications_service import UserFridgeNotificationService
 from user_fridge_notifications_repository import UserFridgeNotificationRepository
 from response_utils import error_response, ErrorCode, HttpStatus
@@ -95,6 +93,9 @@ def handle_post_request(event: dict, userId: str, fridgeId: str, request_id: str
     Returns:
         API Gateway formatted response
     """
+    from pydantic import ValidationError
+    from user_fridge_notifications_model import UserFridgeNotificationModel
+
     body = event.get("body")
     if not body:
         return error_response(HttpStatus.BAD_REQUEST, "Missing request body", ErrorCode.MISSING_BODY) 
@@ -124,6 +125,8 @@ def handle_patch_request(event: dict, userId: str, fridgeId: str, request_id: st
     Returns:
         API Gateway formatted response
     """
+    from pydantic import ValidationError
+
     body = event.get("body")
     if not body:
         return error_response(HttpStatus.BAD_REQUEST, "Missing request body", ErrorCode.MISSING_BODY, request_id=request_id)

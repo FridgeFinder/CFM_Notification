@@ -9,7 +9,9 @@ Description: >
 Globals:
   Function:
     Timeout: 60
-    MemorySize: 256
+    MemorySize: 512
+    Architectures:
+      - x86_64
     Environment:
       Variables:
         TABLE_NAME: !Sub user_fridge_notifications_${Environment}
@@ -121,8 +123,6 @@ Resources:
       CodeUri: functions/hello_world/
       Handler: hello_world_handler.lambda_handler
       Runtime: python3.13
-      Architectures:
-        - x86_64
       Events:
         HelloWorld:
           Type: HttpApi
@@ -232,6 +232,7 @@ Resources:
       Environment:
         Variables:
           USERS_TABLE_NAME: !Sub users_${Environment}
+          USER_DEVICES_TABLE_NAME: !Sub user_devices_${Environment}
           FIREBASE_SECRET_NAME: !Ref FirebaseSecretName
       Policies:
         - Version: "2012-10-17"
@@ -260,6 +261,11 @@ Resources:
             Action:
             - dynamodb:GetItem
             Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users_${Environment}"
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/user_devices_${Environment}"
           - Effect: Allow
             Action:
             - ses:SendEmail
@@ -372,6 +378,8 @@ Resources:
             ContentUri: layers/
             CompatibleRuntimes:
               - python3.13
+            CompatibleArchitectures:
+              - x86_64
             RetentionPolicy: Delete
 
 Outputs:
