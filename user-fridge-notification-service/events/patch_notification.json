@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "routeKey": "PUT /v1/users/{user_id}/fridge-notifications/{fridge_id}",
+  "rawPath": "/v1/users/user_1/fridge-notifications/fridge_1",
+  "headers": {
+    "content-type": "application/json",
+    "authorization": "Bearer <FIREBASE_ID_TOKEN>"
+  },
+  "pathParameters": {
+    "user_id": "user_1",
+    "fridge_id": "fridge_1"
+  },
+  "requestContext": {
+    "http": {
+      "method": "PATCH",
+      "path": "/v1/users/user_1/fridge-notifications/fridge_1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/8.1.2"
+    },
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "user_1",
+          "email": "test@example.com",
+          "email_verified": "true"
+        }
+      }
+    }
+  },
+  "body": "{\n  \"contactTypePreferences\": {\"email\": {\"good\": true, \"dirty\": true, \"outOfOrder\": true, \"notAtLocation\": true, \"ghost\": true, \"noFood\": false, \"hasFood\": true}}\n}",
+  "isBase64Encoded": false
+}

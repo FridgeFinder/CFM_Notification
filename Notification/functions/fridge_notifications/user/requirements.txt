@@ -1,5 +1,0 @@
-# Intentionally empty: shared deps (pydantic, email-validator, phonenumbers) now provided by CommonLayer.
-# boto3 is provided by the Lambda runtime.
-pydantic>=2.0
-email-validator>=2.1.0
-phonenumbers>=8.12.0

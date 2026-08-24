@@ -1,0 +1,197 @@
+"""Unit tests for functions/fridge_report_stream_processor/repositories/notification_repository.py"""
+import unittest
+from unittest.mock import patch
+
+from repositories import notification_repository
+
+# DynamoDB wire-format items returned by mocked queries.
+_DDB_NOTIFICATION = {
+    "fridgeId": {"S": "fridge_1"},
+    "userId": {"S": "user_1"},
+}
+
+_DDB_USER = {
+    "email": {"S": "user@example.com"},
+    "settings": {
+        "M": {
+            "emailNotificationEnabled": {"BOOL": True},
+        }
+    },
+}
+
+
+class TestQueryNotificationsByFridge(unittest.TestCase):
+    def test_returns_deserialized_items(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "notifications_table", "NotifTable"):
+            mock_db.query.return_value = {"Items": [_DDB_NOTIFICATION]}
+            result = notification_repository.query_notifications_by_fridge("fridge_1")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["fridgeId"], "fridge_1")
+        self.assertEqual(result[0]["userId"], "user_1")
+
+    def test_returns_empty_list_when_no_subscribers(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "notifications_table", "NotifTable"):
+            mock_db.query.return_value = {"Items": []}
+            result = notification_repository.query_notifications_by_fridge("fridge_1")
+
+        self.assertEqual(result, [])
+
+    def test_queries_fridge_index_gsi(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "notifications_table", "NotifTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.query_notifications_by_fridge("fridge_1")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertEqual(call_kwargs["IndexName"], "FridgeIndex")
+
+    def test_filters_by_fridge_id(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "notifications_table", "NotifTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.query_notifications_by_fridge("specific_fridge")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertEqual(
+            call_kwargs["ExpressionAttributeValues"][":fridgeId"]["S"], "specific_fridge"
+        )
+
+    def test_returns_multiple_subscribers(self):
+        item2 = {"fridgeId": {"S": "fridge_1"}, "userId": {"S": "user_2"}}
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "notifications_table", "NotifTable"):
+            mock_db.query.return_value = {"Items": [_DDB_NOTIFICATION, item2]}
+            result = notification_repository.query_notifications_by_fridge("fridge_1")
+
+        self.assertEqual(len(result), 2)
+
+
+class TestGetUserDetails(unittest.TestCase):
+    def test_returns_deserialized_user_dict_when_found(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "users_table", "UsersTable"):
+            mock_db.get_item.return_value = {"Item": _DDB_USER}
+            result = notification_repository.get_user_details("user_1")
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["email"], "user@example.com")
+
+    def test_returns_none_when_user_not_found(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "users_table", "UsersTable"):
+            mock_db.get_item.return_value = {}
+            result = notification_repository.get_user_details("user_1")
+
+        self.assertIsNone(result)
+
+    def test_returns_none_on_exception(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "users_table", "UsersTable"):
+            mock_db.get_item.side_effect = Exception("DB unavailable")
+            result = notification_repository.get_user_details("user_1")
+
+        self.assertIsNone(result)
+
+    def test_queries_correct_user_id(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "users_table", "UsersTable"):
+            mock_db.get_item.return_value = {}
+            notification_repository.get_user_details("specific_user")
+
+        call_kwargs = mock_db.get_item.call_args[1]
+        self.assertEqual(call_kwargs["Key"]["userId"]["S"], "specific_user")
+
+_DDB_DEVICE = {
+    "userId": {"S": "user_1"},
+    "installationId": {"S": "install_1"},
+    "token": {"S": "device_token_1"},
+    "platform": {"S": "ios"},
+    "notificationsEnabled": {"BOOL": True},
+}
+
+class TestGetUserDeviceTokens(unittest.TestCase):
+    def test_returns_active_device_tokens(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": [_DDB_DEVICE]}
+            result = notification_repository.get_user_device_tokens("user_1")
+
+        self.assertEqual(result, ["device_token_1"])
+
+    def test_returns_empty_list_when_no_devices(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": []}
+            result = notification_repository.get_user_device_tokens("user_1")
+
+        self.assertEqual(result, [])
+
+    def test_queries_user_devices_table_by_user_id(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.get_user_device_tokens("specific_user")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertEqual(call_kwargs["KeyConditionExpression"], "userId = :userId")
+        self.assertEqual(call_kwargs["ExpressionAttributeValues"][":userId"]["S"], "specific_user")
+
+    def test_filters_to_enabled_devices_only(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.get_user_device_tokens("user_1")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertIn("notificationsEnabled = :enabled", call_kwargs["FilterExpression"])
+        self.assertIn("attribute_not_exists(invalidAt)", call_kwargs["FilterExpression"])
+
+
+class TestGetUserDevices(unittest.TestCase):
+    def test_returns_device_records_with_installation_and_token(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": [_DDB_DEVICE]}
+            result = notification_repository.get_user_devices("user_1")
+
+        self.assertEqual(result, [{"installationId": "install_1", "token": "device_token_1"}])
+
+    def test_queries_installation_id_and_token_projection(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.get_user_devices("user_1")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertEqual(call_kwargs["ProjectionExpression"], "installationId, token")
+
+
+class TestUserDeviceUpdates(unittest.TestCase):
+    def test_mark_user_device_invalid_sets_fields(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"), \
+             patch.object(notification_repository, "_utc_now_iso", return_value="2026-08-06T12:00:00Z"):
+            notification_repository.mark_user_device_invalid("user_1", "install_1")
+
+        call_kwargs = mock_db.update_item.call_args[1]
+        self.assertEqual(call_kwargs["Key"]["userId"]["S"], "user_1")
+        self.assertEqual(call_kwargs["Key"]["installationId"]["S"], "install_1")
+        self.assertIn("notificationsEnabled = :disabled", call_kwargs["UpdateExpression"])
+        self.assertIn("invalidAt = :invalidAt", call_kwargs["UpdateExpression"])
+        self.assertFalse(call_kwargs["ExpressionAttributeValues"][":disabled"]["BOOL"])
+        self.assertEqual(call_kwargs["ExpressionAttributeValues"][":invalidAt"]["S"], "2026-08-06T12:00:00Z")
+
+    def test_mark_user_device_last_delivered_sets_timestamp(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"), \
+             patch.object(notification_repository, "_utc_now_iso", return_value="2026-08-06T12:00:00Z"):
+            notification_repository.mark_user_device_last_delivered("user_1", "install_1")
+
+        call_kwargs = mock_db.update_item.call_args[1]
+        self.assertEqual(call_kwargs["Key"]["userId"]["S"], "user_1")
+        self.assertEqual(call_kwargs["Key"]["installationId"]["S"], "install_1")
+        self.assertIn("lastDeliveredAt = :lastDeliveredAt", call_kwargs["UpdateExpression"])
+        self.assertEqual(call_kwargs["ExpressionAttributeValues"][":lastDeliveredAt"]["S"], "2026-08-06T12:00:00Z")

@@ -1,0 +1,1 @@
+# No external deps — boto3 provided by Lambda runtime, utilities provided by CommonLayer

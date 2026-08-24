@@ -1,0 +1,109 @@
+# samconfig.toml - SAM CLI configuration for guided and non-interactive deploys
+# Replace the placeholder values (Hosted Zone ID, region, stack_name, etc.)
+# Usage: `sam deploy --config-file samconfig.toml --config-env dev`
+
+version = 0.1
+
+# =============================================================================
+# Development Environment
+# Usage: sam deploy --config-env dev
+# =============================================================================
+
+[dev.validate.parameters]
+lint = true
+
+[dev.build.parameters]
+cached = true
+parallel = true
+
+[dev.deploy]
+[dev.deploy.parameters]
+region = "us-east-1"
+s3_bucket = "cfm-sam-artifacts"
+s3_prefix = "user-fridge-notification-service/dev"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+no_fail_on_empty_changeset = false
+stack_name = "user-fridge-notification-service-dev"
+parameter_overrides = [
+    "DeploymentTarget=aws",
+    "Environment=dev",
+    "CFMHostedZoneId=<REPLACE_ME>",
+    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+]
+
+tags = [
+    "project=CFM",
+    "service=user-fridge-notification",
+    "env=dev"
+]
+
+
+# =============================================================================
+# Staging Environment
+# Usage: sam deploy --config-env staging
+# =============================================================================
+
+[staging.validate.parameters]
+lint = true
+
+[staging.build.parameters]
+cached = true
+parallel = true
+
+[staging.deploy]
+[staging.deploy.parameters]
+region = "us-east-1"
+s3_bucket = "cfm-sam-artifacts"
+s3_prefix = "user-fridge-notification-service/staging"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+no_fail_on_empty_changeset = false
+stack_name = "user-fridge-notification-service-staging"
+parameter_overrides = [
+    "DeploymentTarget=aws",
+    "Environment=staging",
+    "CFMHostedZoneId=<REPLACE_ME>",
+    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+]
+
+tags = [
+    "project=FridgeFinder",
+    "service=notifications",
+    "env=staging"
+]
+
+
+# =============================================================================
+# Production Environment
+# Usage: sam deploy --config-env prod
+# =============================================================================
+
+[prod.validate.parameters]
+lint = true
+
+[prod.build.parameters]
+cached = true
+parallel = true
+
+[prod.deploy]
+[prod.deploy.parameters]
+region = "us-east-1"
+s3_bucket = "cfm-sam-artifacts"
+s3_prefix = "user-fridge-notification-service/prod"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+no_fail_on_empty_changeset = false
+stack_name = "user-fridge-notification-service-prod"
+parameter_overrides = [
+    "DeploymentTarget=aws",
+    "Environment=prod",
+    "CFMHostedZoneId=<REPLACE_ME>",
+    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+]
+
+tags = [
+    "project=FridgeFinder",
+    "service=notifications",
+    "env=prod"
+]

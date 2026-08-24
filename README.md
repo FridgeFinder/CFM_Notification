@@ -24,7 +24,7 @@ User's of FridgeFinder are able to receive notification on status updates of a C
 
 User's can Follow to a Community Fridge by going to a Fridge Profile and clicking on the Follow Button [TODO: implement follow button :)] - find one near you https://www.fridgefinder.app/browse
 
-Currently User's can receive fridge notification via Email or SMS
+Currently User's can receive fridge notification via Email or Device Push Notification
 
 ---
 ## Pre-Requisites
@@ -70,13 +70,13 @@ Follow these steps to get Dynamodb running locally
 
 Confirm that the following requests work for you
 
-1. `cd Notification/`
+1. `cd user-fridge-notification-service/`
 2. `sam build --use-container`
 3. `sam local invoke HelloWorldFunction --event events/event.json`
-    * response: ```{"statusCode": 200, "body": "{\"message\": \"hello world\"}"}```
+    * response: ```{"statusCode": 200, "body": "{\"message\": \"hello world - notification service\"}"}```
 4. `sam local start-api`
 5. `curl http://localhost:3000/hello`
-    * response: ```{"message": "hello world"}```
+    * response: ```{"message": "hello world - notification service"}```
 
 If it does yay, keep going 🤸‍♀️
 
@@ -90,22 +90,42 @@ Note: make sure your local dynamodb instance is running on docker. Follow instru
 
 #### Local Invoke
 
-To test locally we use `sam local invoke` to mimick a cognito authorized request
+To test locally we use `sam local invoke` to mimick a Firebase authorized request
+
+**Note:** You'll need to replace `<FIREBASE_ID_TOKEN>` in the event JSON files with a valid Firebase ID token from your Firebase project
 
 1. POST Example
     ```bash
-    sam local invoke UserFridgeNotificationsFunction --event events/post_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+    sam local invoke UserFridgeNotificationsFunction --event events/post_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
     ```
 
-2. PUT Example
+2. PATCH Example
      ```bash
-     sam local invoke UserFridgeNotificationsFunction --event events/put_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+     sam local invoke UserFridgeNotificationsFunction --event events/patch_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
      ```
      
 3. GET Example
     ```bash
-    sam local invoke UserFridgeNotificationsFunction --event events/get_notification.json --parameter-overrides ParameterKey=Environment,ParameterValue=local ParameterKey=Stage,ParameterValue=dev --docker-network cfm-network
+    sam local invoke UserFridgeNotificationsFunction --event events/get_notification.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
     ```
+
+#### Get All User Notifications
+
+To retrieve all notification preferences for a user across all fridges:
+
+URL format: `v1/users/{user_id}/fridge-notifications`
+
+**Local Invoke Example:**
+```bash
+sam local invoke GetAllUserFridgeNotificationsFunction --event events/get_all_user_notifications.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
+```
+
+#### User Deletion Handler
+Cleans up notifications when a user is deleted:
+
+```bash
+Notification$ sam local invoke UserDeletionHandlerFunction --event events/user_deletion_event.json --parameter-overrides ParameterKey=DeploymentTarget,ParameterValue=local ParameterKey=Environment,ParameterValue=dev ParameterKey=FirebaseProjectId,ParameterValue=your-firebase-project-id --docker-network cfm-network
+```
 
 ---
 ## Running Unit Tests
@@ -117,29 +137,35 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Upgrade packaging tools and install the project in editable mode:
+2. Install test dependencies:
 
 ```sh
-pip install -U pip setuptools wheel
-pip install -e .
+pip install -r user-fridge-notification-service/tests/requirements.txt
 ```
 
-3. Install test dependencies:
+4. Run tests:
 
 ```sh
-pip install -r Notification/tests/requirements.txt
+pytest user-fridge-notification-service/tests/unit
 ```
 
-4. Run tests (unittest discovery):
+Or run with coverage:
 
 ```sh
-python -m unittest discover -s Notification/tests/unit -t .
+pytest user-fridge-notification-service/tests/unit --cov=user-fridge-notification-service/functions --cov-report=term-missing
+```
+
+To generate an HTML coverage report:
+
+```sh
+pytest user-fridge-notification-service/tests/unit --cov=user-fridge-notification-service/functions --cov-report=html
+# Open htmlcov/index.html in your browser to view the report
 ```
 
 Or run a single test file:
 
 ```sh
-python -m unittest Notification.tests.unit.test_user_fridge_notifications_api
+pytest user-fridge-notification-service/tests/unit/test_user_fridge_notifications_api.py
 ```
 
 To deactivate the environment when done:
@@ -148,27 +174,54 @@ deactivate
 ```
 
 ## Deployment
-1. Build: `sam build --use-container`
-2. Deploy: `sam deploy --config-file samconfig.toml --config-env <ENVIRONMENT>`
-  * edit CFMHostedZoneId in samconfig.toml 
 
-## APIs with Cognito ID Token - Dev Server Examples
+### Prerequisites
+- Update `samconfig.toml` with your:
+  - `CFMHostedZoneId` (from Route53 console)
+  - `FirebaseProjectId` (your Firebase project ID)
 
-Only authenticated users are able to get or edit their notification preferences
+### Deploy Steps
+1. Navigate to service directory: `cd user-fridge-notification-service/`
+2. Build: `sam build --use-container`
+3. Deploy to environment:
+   ```bash
+   # Deploy to dev
+   sam deploy --config-file samconfig.toml --config-env dev
+   
+   # Deploy to staging
+   sam deploy --config-file samconfig.toml --config-env staging
+   
+   # Deploy to prod
+   sam deploy --config-file samconfig.toml --config-env prod
+   ```
 
-### GET
+### Environment Variables
+The following parameters are configured per environment:
+- `DeploymentTarget`: `aws` (for deployed environments) or `local` (for local testing)
+- `Environment`: `dev`, `staging`, or `prod`
+- `CFMHostedZoneId`: Route53 Hosted Zone ID for custom domain
+- `FirebaseProjectId`: Firebase Project ID for authentication
+
+---
+## Linting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+
+Install it via the local requirements (from the project root with your virtual environment active):
+
+```sh
+pip install -r user-fridge-notification-service/local_requirements.txt
 ```
-curl --location --request GET 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>' --header 'Authorization: <ID_TOKEN>'
-```
 
-### POST/PUT
-```
-curl --location --request <POST/PUT> 'https://notifications-api-dev.communityfridgefinder.com/v1/users/<USER_ID>/notifications/<FRIDGE_ID>'
---header 'Authorization: <ID_TOKEN>'
---header 'Content-Type: application/json'
---data '{
-    "contact_types_status": {"sms": "stop"},
-    "contact_types_preferences": {"sms": {"good": true, "dirty": true, "out_of_order": true, "not_at_location": true, "ghost": true, "food_level_0": false, "food_level_1": false, "food_level_2": true, "food_level_3": true, "cleaned": false}},
-    "contact_info": {"sms": "+18577048438"}
-  }'
+Run the linter:
+
+```sh
+# Check for lint errors
+ruff check user-fridge-notification-service/
+
+# Auto-fix lint errors where possible
+ruff check --fix user-fridge-notification-service/
+
+# Format code
+ruff format user-fridge-notification-service/
 ```
