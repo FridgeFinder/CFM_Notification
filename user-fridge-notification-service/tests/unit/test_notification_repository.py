@@ -15,7 +15,6 @@ _DDB_USER = {
     "settings": {
         "M": {
             "emailNotificationEnabled": {"BOOL": True},
-            "pushNotificationEnabled": {"BOOL": False},
         }
     },
 }
@@ -149,3 +148,50 @@ class TestGetUserDeviceTokens(unittest.TestCase):
         call_kwargs = mock_db.query.call_args[1]
         self.assertIn("notificationsEnabled = :enabled", call_kwargs["FilterExpression"])
         self.assertIn("attribute_not_exists(invalidAt)", call_kwargs["FilterExpression"])
+
+
+class TestGetUserDevices(unittest.TestCase):
+    def test_returns_device_records_with_installation_and_token(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": [_DDB_DEVICE]}
+            result = notification_repository.get_user_devices("user_1")
+
+        self.assertEqual(result, [{"installationId": "install_1", "token": "device_token_1"}])
+
+    def test_queries_installation_id_and_token_projection(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"):
+            mock_db.query.return_value = {"Items": []}
+            notification_repository.get_user_devices("user_1")
+
+        call_kwargs = mock_db.query.call_args[1]
+        self.assertEqual(call_kwargs["ProjectionExpression"], "installationId, token")
+
+
+class TestUserDeviceUpdates(unittest.TestCase):
+    def test_mark_user_device_invalid_sets_fields(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"), \
+             patch.object(notification_repository, "_utc_now_iso", return_value="2026-08-06T12:00:00Z"):
+            notification_repository.mark_user_device_invalid("user_1", "install_1")
+
+        call_kwargs = mock_db.update_item.call_args[1]
+        self.assertEqual(call_kwargs["Key"]["userId"]["S"], "user_1")
+        self.assertEqual(call_kwargs["Key"]["installationId"]["S"], "install_1")
+        self.assertIn("notificationsEnabled = :disabled", call_kwargs["UpdateExpression"])
+        self.assertIn("invalidAt = :invalidAt", call_kwargs["UpdateExpression"])
+        self.assertFalse(call_kwargs["ExpressionAttributeValues"][":disabled"]["BOOL"])
+        self.assertEqual(call_kwargs["ExpressionAttributeValues"][":invalidAt"]["S"], "2026-08-06T12:00:00Z")
+
+    def test_mark_user_device_last_delivered_sets_timestamp(self):
+        with patch.object(notification_repository, "dynamodb") as mock_db, \
+             patch.object(notification_repository, "user_devices_table", "UserDevicesTable"), \
+             patch.object(notification_repository, "_utc_now_iso", return_value="2026-08-06T12:00:00Z"):
+            notification_repository.mark_user_device_last_delivered("user_1", "install_1")
+
+        call_kwargs = mock_db.update_item.call_args[1]
+        self.assertEqual(call_kwargs["Key"]["userId"]["S"], "user_1")
+        self.assertEqual(call_kwargs["Key"]["installationId"]["S"], "install_1")
+        self.assertIn("lastDeliveredAt = :lastDeliveredAt", call_kwargs["UpdateExpression"])
+        self.assertEqual(call_kwargs["ExpressionAttributeValues"][":lastDeliveredAt"]["S"], "2026-08-06T12:00:00Z")

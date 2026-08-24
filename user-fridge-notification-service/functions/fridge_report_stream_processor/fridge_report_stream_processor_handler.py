@@ -4,8 +4,14 @@ from typing import Dict, Any
 # Local imports
 from constants import CONDITION_MAP, FOOD_LEVEL_NOTIFICATION_MAP
 from utils.firebase_client import initialize_firebase
-from repositories.notification_repository import query_notifications_by_fridge, get_user_details, get_user_device_tokens
-from services.notification_service import send_email_notification, send_push_notification
+from repositories.notification_repository import (
+    query_notifications_by_fridge,
+    get_user_details,
+    get_user_devices,
+    mark_user_device_invalid,
+    mark_user_device_last_delivered,
+)
+from services.notification_service import send_email_notification, send_push_notification, PushSendResult
 
 # Set up logging
 logger = logging.getLogger()
@@ -39,7 +45,6 @@ def process_fridge_report(fridge_id: str, fridge_condition: str, food_level: int
         # Extract user settings, each one has their own thing so it makes sense.. 
         settings = user.get('settings', {})
         email_enabled = settings.get('emailNotificationEnabled', False)
-        push_enabled = settings.get('pushNotificationEnabled', False)
         ######
         if email_enabled:
             email = user.get('email')
@@ -54,20 +59,34 @@ def process_fridge_report(fridge_id: str, fridge_condition: str, food_level: int
         else:
             logger.info(f"User {user_id} has email notifications disabled")
         
-        # Check and send push notification
-        if push_enabled:
-            fcm_tokens = get_user_device_tokens(user_id)
-            if fcm_tokens:
-                device_prefs = (pref.get('contactTypePreferences') or {}).get('device')
-                if device_prefs:
-                    for fcm_token in fcm_tokens:
-                        send_push_notification(device_prefs, fcm_token, fridge_id, formated_fridge_condition, formated_food_condition, food_level)
-                else:
-                    logger.info(f"User {user_id} has no device notification preferences configured")
+        # Check and send push notification (device-level enablement only)
+        devices = get_user_devices(user_id)
+        if devices:
+            device_prefs = (pref.get('contactTypePreferences') or {}).get('device')
+            if device_prefs:
+                for device in devices:
+                    installation_id = device.get('installationId')
+                    fcm_token = device.get('token')
+                    if not installation_id or not fcm_token:
+                        logger.warning(f"Skipping malformed device record for user {user_id}")
+                        continue
+
+                    result = send_push_notification(
+                        device_prefs,
+                        fcm_token,
+                        fridge_id,
+                        formated_fridge_condition,
+                        formated_food_condition,
+                        food_level,
+                    )
+                    if result == PushSendResult.SUCCESS:
+                        mark_user_device_last_delivered(user_id, installation_id)
+                    elif result == PushSendResult.INVALID_TOKEN:
+                        mark_user_device_invalid(user_id, installation_id)
             else:
-                logger.info(f"User {user_id} has push notifications enabled but no registered device tokens found")
+                logger.info(f"User {user_id} has no device notification preferences configured")
         else:
-            logger.info(f"User {user_id} has push notifications disabled")
+            logger.info(f"User {user_id} has no registered device tokens found")
 
 
 def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:

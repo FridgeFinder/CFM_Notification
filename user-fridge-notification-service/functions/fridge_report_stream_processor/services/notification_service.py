@@ -4,6 +4,7 @@ Notification service for sending email and push notifications.
 import logging
 import os
 from typing import Optional
+from enum import Enum
 import firebase_admin
 from firebase_admin import messaging
 from utils.aws_clients import get_ses_connection
@@ -17,6 +18,16 @@ ses = get_ses_connection()
 # Get environment for URL construction
 environment = os.environ.get('ENVIRONMENT', 'dev')
 base_url = "https://www.fridgefinder.app" if environment == 'prod' else f"https://{environment}.fridgefinder.app"
+
+
+class PushSendResult(str, Enum):
+    """Outcome of an individual push send attempt."""
+    SKIPPED_FIREBASE = 'skipped_firebase'
+    SKIPPED_PREFERENCES = 'skipped_preferences'
+    SUCCESS = 'success'
+    INVALID_TOKEN = 'invalid_token'
+    SENDER_ID_MISMATCH = 'sender_id_mismatch'
+    FAILED = 'failed'
 
 
 def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fridge_condition: str, formated_food_condition: str, food_level: int):
@@ -184,17 +195,17 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
         logger.error(f"Failed to send email to {email}: {e}")
 
 
-def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_fridge_condition: str, formated_food_condition: str, food_level: int):
+def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_fridge_condition: str, formated_food_condition: str, food_level: int) -> PushSendResult:
     """Send push notification via Firebase Cloud Messaging."""
     if not firebase_admin._apps:
         logger.warning('Firebase not initialized, skipping push notification')
-        return
+        return PushSendResult.SKIPPED_FIREBASE
     
     try:
         message = get_notification_message(pref, formated_fridge_condition, formated_food_condition, food_level)
         if not message:
             logger.info('User does not want push notifications for this condition/food level')
-            return
+            return PushSendResult.SKIPPED_PREFERENCES
         
         message = messaging.Message(
             notification=messaging.Notification(
@@ -206,14 +217,17 @@ def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_
         
         response = messaging.send(message)
         logger.info(f'Push notification sent successfully. Response: {response}')
+        return PushSendResult.SUCCESS
         
     except messaging.UnregisteredError:
         logger.warning(f'FCM token is invalid or unregistered: {fcm_token[:20]}...')
-        # TODO: Mark token as invalid in user table
+        return PushSendResult.INVALID_TOKEN
     except messaging.SenderIdMismatchError:
         logger.error('FCM token belongs to different Firebase project')
+        return PushSendResult.SENDER_ID_MISMATCH
     except Exception as e:
         logger.error(f'Failed to send push notification: {e}', exc_info=True)
+        return PushSendResult.FAILED
 
 
 def get_notification_message(contact_prefs: dict, formatted_fridge_condition: str, formated_food_condition: str, food_level: Optional[int]):

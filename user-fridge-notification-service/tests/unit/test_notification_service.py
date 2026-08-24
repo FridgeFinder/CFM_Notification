@@ -117,26 +117,28 @@ class TestSendPushNotification(unittest.TestCase):
     def test_skips_when_firebase_not_initialized(self):
         with patch.object(notification_service.firebase_admin, "_apps", {}), \
              patch.object(notification_service, "messaging") as mock_msg:
-            notification_service.send_push_notification(
+            result = notification_service.send_push_notification(
                 self._prefs(), "token_abc", "fridge_1", "good", "hasFood", 1
             )
         mock_msg.send.assert_not_called()
+        self.assertEqual(result, notification_service.PushSendResult.SKIPPED_FIREBASE)
 
     def test_sends_push_when_firebase_initialized_and_pref_matches(self):
         fake_apps = {"default": MagicMock()}
         with patch.object(notification_service.firebase_admin, "_apps", fake_apps), \
              patch.object(notification_service, "messaging") as mock_msg:
             mock_msg.Message.return_value = MagicMock()
-            notification_service.send_push_notification(
+            result = notification_service.send_push_notification(
                 self._prefs(), "token_abc", "fridge_1", "good", "hasFood", 1
             )
         mock_msg.send.assert_called_once()
+        self.assertEqual(result, notification_service.PushSendResult.SUCCESS)
 
     def test_does_not_send_when_no_pref_matches(self):
         fake_apps = {"default": MagicMock()}
         with patch.object(notification_service.firebase_admin, "_apps", fake_apps), \
              patch.object(notification_service, "messaging") as mock_msg:
-            notification_service.send_push_notification(
+            result = notification_service.send_push_notification(
                 self._prefs(condition_on=False, food_on=False),
                 "token_abc",
                 "fridge_1",
@@ -145,6 +147,7 @@ class TestSendPushNotification(unittest.TestCase):
                 1,
             )
         mock_msg.send.assert_not_called()
+        self.assertEqual(result, notification_service.PushSendResult.SKIPPED_PREFERENCES)
 
     def test_does_not_raise_on_generic_fcm_exception(self):
         fake_apps = {"default": MagicMock()}
@@ -155,6 +158,20 @@ class TestSendPushNotification(unittest.TestCase):
             mock_msg.UnregisteredError = type("UnregisteredError", (Exception,), {})
             mock_msg.SenderIdMismatchError = type("SenderIdMismatchError", (Exception,), {})
             # Should not raise
-            notification_service.send_push_notification(
+            result = notification_service.send_push_notification(
                 self._prefs(), "token_abc", "fridge_1", "good", "hasFood", 1
             )
+        self.assertEqual(result, notification_service.PushSendResult.FAILED)
+
+    def test_returns_invalid_token_on_unregistered_error(self):
+        fake_apps = {"default": MagicMock()}
+        with patch.object(notification_service.firebase_admin, "_apps", fake_apps), \
+             patch.object(notification_service, "messaging") as mock_msg:
+            mock_msg.Message.return_value = MagicMock()
+            mock_msg.UnregisteredError = type("UnregisteredError", (Exception,), {})
+            mock_msg.SenderIdMismatchError = type("SenderIdMismatchError", (Exception,), {})
+            mock_msg.send.side_effect = mock_msg.UnregisteredError("bad token")
+            result = notification_service.send_push_notification(
+                self._prefs(), "token_abc", "fridge_1", "good", "hasFood", 1
+            )
+        self.assertEqual(result, notification_service.PushSendResult.INVALID_TOKEN)

@@ -140,10 +140,9 @@ class TestProcessFridgeReport(unittest.TestCase):
             "contactTypePreferences": {"device": prefs or _ALL_PREFS},
         }
 
-    def _user(self, email=True, push=False):
+    def _user(self, email=True):
         u = {"settings": {
             "emailNotificationEnabled": email,
-            "pushNotificationEnabled": push,
         }}
         if email:
             u["email"] = "user@example.com"
@@ -158,17 +157,24 @@ class TestProcessFridgeReport(unittest.TestCase):
 
     def test_sends_push_notification_when_push_enabled(self):
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
-             patch.object(handler, "get_user_details", return_value=self._user(push=True)), \
-             patch.object(handler, "get_user_device_tokens", return_value=["fcm_token_abc"]), \
+             patch.object(handler, "get_user_details", return_value=self._user()), \
+             patch.object(handler, "get_user_devices", return_value=[{"installationId": "install_1", "token": "fcm_token_abc"}]), \
+             patch.object(handler, "mark_user_device_last_delivered") as mock_mark_delivered, \
              patch.object(handler, "send_push_notification") as mock_push:
+            mock_push.return_value = handler.PushSendResult.SUCCESS
             handler.process_fridge_report("fridge_1", "good", 1)
         mock_push.assert_called_once()
+        mock_mark_delivered.assert_called_once_with("user_1", "install_1")
 
     def test_sends_push_notification_for_each_device_token(self):
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
-             patch.object(handler, "get_user_details", return_value=self._user(push=True)), \
-             patch.object(handler, "get_user_device_tokens", return_value=["token_1", "token_2"]), \
+             patch.object(handler, "get_user_details", return_value=self._user()), \
+             patch.object(handler, "get_user_devices", return_value=[
+                 {"installationId": "install_1", "token": "token_1"},
+                 {"installationId": "install_2", "token": "token_2"},
+             ]), \
              patch.object(handler, "send_push_notification") as mock_push:
+            mock_push.return_value = handler.PushSendResult.SUCCESS
             handler.process_fridge_report("fridge_1", "good", 1)
 
         self.assertEqual(mock_push.call_count, 2)
@@ -181,7 +187,7 @@ class TestProcessFridgeReport(unittest.TestCase):
         mock_email.assert_not_called()
 
     def test_no_email_sent_when_email_notifications_disabled(self):
-        user = {"email": "user@example.com", "settings": {"emailNotificationEnabled": False, "pushNotificationEnabled": False}}
+        user = {"email": "user@example.com", "settings": {"emailNotificationEnabled": False}}
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_email()]), \
              patch.object(handler, "get_user_details", return_value=user), \
              patch.object(handler, "send_email_notification") as mock_email:
@@ -189,13 +195,37 @@ class TestProcessFridgeReport(unittest.TestCase):
         mock_email.assert_not_called()
 
     def test_no_push_sent_when_no_fcm_token(self):
-        user = {"settings": {"emailNotificationEnabled": False, "pushNotificationEnabled": True}}
+        user = {"settings": {"emailNotificationEnabled": False}}
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
              patch.object(handler, "get_user_details", return_value=user), \
-             patch.object(handler, "get_user_device_tokens", return_value=[]), \
+             patch.object(handler, "get_user_devices", return_value=[]), \
              patch.object(handler, "send_push_notification") as mock_push:
             handler.process_fridge_report("fridge_1", "good", 1)
         mock_push.assert_not_called()
+
+    def test_marks_device_invalid_on_invalid_token_result(self):
+        user = {"settings": {"emailNotificationEnabled": False}}
+        with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
+             patch.object(handler, "get_user_details", return_value=user), \
+             patch.object(handler, "get_user_devices", return_value=[{"installationId": "install_1", "token": "token_1"}]), \
+             patch.object(handler, "send_push_notification", return_value=handler.PushSendResult.INVALID_TOKEN), \
+             patch.object(handler, "mark_user_device_invalid") as mock_mark_invalid, \
+             patch.object(handler, "mark_user_device_last_delivered") as mock_mark_delivered:
+            handler.process_fridge_report("fridge_1", "good", 1)
+
+        mock_mark_invalid.assert_called_once_with("user_1", "install_1")
+        mock_mark_delivered.assert_not_called()
+
+    def test_sends_push_even_without_push_flag_in_user_settings(self):
+        user_without_push_flag = {"settings": {"emailNotificationEnabled": False}}
+        with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_device()]), \
+             patch.object(handler, "get_user_details", return_value=user_without_push_flag), \
+             patch.object(handler, "get_user_devices", return_value=[{"installationId": "install_1", "token": "token_1"}]), \
+             patch.object(handler, "send_push_notification") as mock_push:
+            mock_push.return_value = handler.PushSendResult.SUCCESS
+            handler.process_fridge_report("fridge_1", "good", 1)
+
+        mock_push.assert_called_once()
 
     def test_returns_early_for_unknown_condition(self):
         with patch.object(handler, "query_notifications_by_fridge", return_value=[self._pref_with_email()]), \
