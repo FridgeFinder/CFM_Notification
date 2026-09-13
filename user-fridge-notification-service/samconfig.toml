@@ -28,8 +28,8 @@ stack_name = "user-fridge-notification-service-dev"
 parameter_overrides = [
     "DeploymentTarget=aws",
     "Environment=dev",
-    "CFMHostedZoneId=<REPLACE_ME>",
-    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+    "CFMHostedZoneId=Z03114523DQKTV4IMEMPR",
+    "FirebaseProjectId=fridgefinder-app-dev"  # Replace with your actual Firebase Project ID
 ]
 
 tags = [
@@ -64,7 +64,8 @@ parameter_overrides = [
     "DeploymentTarget=aws",
     "Environment=staging",
     "CFMHostedZoneId=<REPLACE_ME>",
-    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+    "FirebaseProjectId=<REPLACE_ME>",  # Replace with your actual Firebase Project ID
+    "FirebaseSecretName=firebase-service-account-staging"
 ]
 
 tags = [
@@ -98,8 +99,9 @@ stack_name = "user-fridge-notification-service-prod"
 parameter_overrides = [
     "DeploymentTarget=aws",
     "Environment=prod",
-    "CFMHostedZoneId=<REPLACE_ME>",
-    "FirebaseProjectId=<REPLACE_ME>"  # Replace with your actual Firebase Project ID
+    "CFMHostedZoneId=Z03114523DQKTV4IMEMPR",
+    "FirebaseProjectId=fridgefinder-app",  # Replace with your actual Firebase Project ID
+    "FirebaseSecretName=firebase-service-account-prod"
 ]
 
 tags = [

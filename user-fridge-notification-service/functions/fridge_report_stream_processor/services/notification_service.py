@@ -212,6 +212,9 @@ def send_push_notification(pref: dict, fcm_token: str, fridge_id: str, formated_
                 title=fridge_id,
                 body=message
             ),
+            data={
+                "fridgeId": fridge_id,
+            },
             token=fcm_token,
         )
         

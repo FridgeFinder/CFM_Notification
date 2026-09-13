@@ -131,6 +131,10 @@ class TestSendPushNotification(unittest.TestCase):
             result = notification_service.send_push_notification(
                 self._prefs(), "token_abc", "fridge_1", "good", "hasFood", 1
             )
+        mock_msg.Message.assert_called_once()
+        _, kwargs = mock_msg.Message.call_args
+        self.assertEqual(kwargs.get("data"), {"fridgeId": "fridge_1"})
+        self.assertEqual(kwargs.get("token"), "token_abc")
         mock_msg.send.assert_called_once()
         self.assertEqual(result, notification_service.PushSendResult.SUCCESS)
 
