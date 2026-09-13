@@ -166,7 +166,8 @@ class TestGetUserDevices(unittest.TestCase):
             notification_repository.get_user_devices("user_1")
 
         call_kwargs = mock_db.query.call_args[1]
-        self.assertEqual(call_kwargs["ProjectionExpression"], "installationId, token")
+        self.assertEqual(call_kwargs["ProjectionExpression"], "installationId, #token")
+        self.assertEqual(call_kwargs["ExpressionAttributeNames"], {"#token": "token"})
 
 
 class TestUserDeviceUpdates(unittest.TestCase):

@@ -45,7 +45,9 @@ def get_user_details(user_id: str) -> Optional[Dict]:
         response = dynamodb.get_item(
             TableName=users_table,
             Key={'userId': {'S': user_id}},
-            ProjectionExpression='email, settings'
+            # 'settings' is a DynamoDB reserved keyword
+            ProjectionExpression='email, #settings',
+            ExpressionAttributeNames={'#settings': 'settings'}
         )
         
         if 'Item' not in response:
@@ -75,7 +77,9 @@ def get_user_devices(user_id: str) -> List[Dict[str, str]]:
                 ':userId': {'S': user_id},
                 ':enabled': {'BOOL': True},
             },
-            ProjectionExpression='installationId, token'
+            # 'token' is a DynamoDB reserved keyword
+            ProjectionExpression='installationId, #token',
+            ExpressionAttributeNames={'#token': 'token'}
         )
 
         items = [dynamodb_to_dict(item) for item in response.get('Items', [])]
