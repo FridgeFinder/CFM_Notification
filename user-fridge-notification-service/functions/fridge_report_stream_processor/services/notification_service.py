@@ -123,13 +123,8 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
                                     <table role="presentation" style="margin: 0 auto 12px auto;">
                                         <tr>
                                             <td style="padding: 0 5px;">
-                                                <a href="https://apps.apple.com/app/YOUR_APP_ID" style="display: inline-block;">
+                                                <a href="https://apps.apple.com/app/fridgefinder/id6755344724" style="display: inline-block;">
                                                     <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" style="height: 45px; width: auto;" />
-                                                </a>
-                                            </td>
-                                            <td style="padding: 0 5px;">
-                                                <a href="https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME" style="display: inline-block;">
-                                                    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" style="height: 63px; width: auto;" />
                                                 </a>
                                             </td>
                                         </tr>
@@ -141,13 +136,13 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
                                         You received this because you subscribed to updates for this community fridge.
                                     </p>
                                     <p style="margin: 0 0 15px 0; color: #999999; font-size: 12px;">
-                                        <a href="{base_url}/preferences" style="color: #88B3FF; text-decoration: none;">Manage Preferences</a>
+                                        <a href="{base_url}/my-fridges" style="color: #88B3FF; text-decoration: none;">Manage Preferences</a>
                                         &nbsp;|&nbsp;
                                         <a href="{base_url}/privacy" style="color: #88B3FF; text-decoration: none;">Privacy Policy</a>
                                         &nbsp;|&nbsp;
-                                        <a href="{base_url}/support" style="color: #88B3FF; text-decoration: none;">Contact Support</a>
+                                        <a href="{base_url}/contact" style="color: #88B3FF; text-decoration: none;">Contact Support</a>
                                         &nbsp;|&nbsp;
-                                        <a href="{base_url}/unsubscribe?token=eyJhbGciOiJ" style="color: #88B3FF; text-decoration: none;">Unsubscribe</a>
+                                        <a href="{base_url}/fridge/{fridge_id}/notifications" style="color: #88B3FF; text-decoration: none;">Unfollow</a>
                                     </p>
                                     <p style="margin: 0; color: #999999; font-size: 11px;">
                                         © 2026 FridgeFinder. All rights reserved.
@@ -176,7 +171,7 @@ def send_email_notification(pref: dict, email: str, fridge_id: str, formated_fri
         Stay connected with your local community fridges!
         
         ---
-        Unsubscribe: {base_url}/unsubscribe?token=eyJhbGciOiJ
+        Manage notifications: {base_url}/fridge/{fridge_id}/notifications
         """
 
         ses.send_email(
