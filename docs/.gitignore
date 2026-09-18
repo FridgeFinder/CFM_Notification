@@ -1,0 +1,6 @@
+# Keep the docs folder in git
+*
+!.gitignore
+!index.html
+!openapi.yaml
+!README.md

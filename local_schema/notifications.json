@@ -2,22 +2,44 @@
   "TableName": "user_fridge_notifications_dev",
   "AttributeDefinitions": [
     {
-      "AttributeName": "user_id",
+      "AttributeName": "userId",
       "AttributeType": "S"
     },
     {
-      "AttributeName": "fridge_id",
+      "AttributeName": "fridgeId",
       "AttributeType": "S"
     }
   ],
   "KeySchema": [
     {
-      "AttributeName": "user_id",
+      "AttributeName": "userId",
       "KeyType": "HASH"
     },
     {
-      "AttributeName": "fridge_id",
+      "AttributeName": "fridgeId",
       "KeyType": "RANGE"
+    }
+  ],
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "FridgeIndex",
+      "KeySchema": [
+        {
+          "AttributeName": "fridgeId",
+          "KeyType": "HASH"
+        },
+        {
+          "AttributeName": "userId",
+          "KeyType": "RANGE"
+        }
+      ],
+      "Projection": {
+        "ProjectionType": "ALL"
+      },
+      "ProvisionedThroughput": {
+        "ReadCapacityUnits": 5,
+        "WriteCapacityUnits": 5
+      }
     }
   ],
   "ProvisionedThroughput": {

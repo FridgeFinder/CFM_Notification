@@ -1,0 +1,30 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /v1/users/{user_id}/fridge-notifications",
+  "rawPath": "/v1/users/user_1/fridge-notifications",
+  "headers": {
+    "authorization": "Bearer <FIREBASE_ID_TOKEN>"
+  },
+  "pathParameters": {
+    "user_id": "user_1"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/v1/users/user_1/fridge-notifications",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/8.1.2"
+    },
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "user_1",
+          "email": "test@example.com",
+          "email_verified": "true"
+        }
+      }
+    }
+  },
+  "body": null,
+  "isBase64Encoded": false
+}
